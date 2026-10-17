@@ -1,0 +1,18 @@
+# 运行时数据：服务端配置与备份，可能包含密钥，永不入库
+data/
+
+# 测试与临时产物
+work/
+
+# 交付副本（由同步流程生成，仓库里不重复存）
+outputs/
+
+# 测试用第三方依赖（仅本地跑 UI 测试用，产物本身零依赖）
+.test-tools/
+node_modules/
+
+# 系统与编辑器垃圾
+Thumbs.db
+desktop.ini
+.DS_Store
+*.log

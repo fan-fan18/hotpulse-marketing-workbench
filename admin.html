@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HotPulse 配置后台 · 热点营销工作台</title>
+<link rel="icon" href="data:," />
+<link rel="stylesheet" href="assets/css/styles.css" />
+<link rel="stylesheet" href="assets/css/admin.css" />
+</head>
+<body class="admin">
+
+<!-- ============ 顶栏：后台标识 / 数据来源徽章 / 返回工作台 ============ -->
+<header class="admin-top">
+  <div class="logo">
+    <span class="logo-mark">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 4 13.2h5.2L8.6 22 20 10.4h-5.6L15.6 2z"/></svg>
+    </span>
+    <span class="logo-text"><strong>热点引擎</strong><em>HotPulse</em></span>
+  </div>
+  <span class="admin-tag">配置后台</span>
+  <span class="admin-divider"></span>
+  <div class="admin-title">后台配置中心 <span>· 配置对工作台直接生效</span></div>
+
+  <div class="top-spacer"></div>
+
+  <span class="src-badge defaults" id="srcBadge" title="配置读取顺序：服务端 → 本机浏览器 → 内置默认值">
+    <span>数据来源</span><b id="srcName">—</b>
+    <span class="lvl" id="srcLevel"><i></i><i class="mid"></i><i class="top"></i></span>
+  </span>
+  <span class="dirty-flag" id="dirtyFlag" hidden><span class="dot"></span>有未保存的改动</span>
+
+  <span class="admin-divider"></span>
+  <button class="btn ghost" id="shortcutBtn" title="查看快捷键">快捷键</button>
+  <a class="btn primary" href="index.html" id="backBtn">返回工作台</a>
+  <span class="avatar" title="林晓棠 · 运营主编">林</span>
+</header>
+
+<div class="admin-layout">
+  <!-- ============ 左侧导航：两组 ============ -->
+  <aside class="admin-side">
+    <div class="side-group">
+      <h4>本页配置区块</h4>
+      <div id="navSections"></div>
+      <p class="side-note" id="navSectionsNote">点击可滚动到对应区块。</p>
+    </div>
+    <div class="side-group">
+      <h4>其它后台页面</h4>
+      <div id="navPages"></div>
+    </div>
+  </aside>
+
+  <!-- ============ 内容区：卡片式分节 ============ -->
+  <main class="admin-main" id="adminMain"></main>
+</div>
+
+<!-- ============ 底部固定操作栏（滚动时不消失） ============ -->
+<footer class="admin-bar" id="adminBar">
+  <div class="bar-status">
+    <b id="barTitle">已保存</b>
+    <span id="barHint">修改后按 <span class="kbd">Ctrl</span> + <span class="kbd">S</span> 保存，或点右侧「保存配置」</span>
+  </div>
+  <div class="bar-actions">
+    <button class="btn ghost" id="btnResetPage">恢复本页默认</button>
+    <button class="btn ghost" id="btnRevert">撤销未保存改动</button>
+    <button class="btn ghost" id="btnExport">导出配置</button>
+    <button class="btn ghost" id="btnImport">导入配置</button>
+    <button class="btn primary" id="btnSave">保存配置</button>
+  </div>
+</footer>
+
+<input type="file" id="filePicker" accept=".json,application/json" hidden />
+<div class="toast-wrap" id="toastWrap"></div>
+<div id="modalHost"></div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/core/config.js"></script>
+<script src="assets/js/core/products.js"></script>
+<script src="assets/js/core/prompt.js"></script>
+<script src="assets/js/core/llm.js"></script>
+<script src="assets/js/core/eval.js"></script>
+<script src="assets/js/admin/admin-prompt-page.js"></script>
+<script src="assets/js/admin/admin-style-page.js"></script>
+<script src="assets/js/admin/admin-model-page.js"></script>
+<script src="assets/js/admin/admin-product-page.js"></script>
+<script src="assets/js/admin/admin-source-page.js"></script>
+<script src="assets/js/admin/admin-eval-page.js"></script>
+<script src="assets/js/admin/admin-core.js"></script>
+<script>HP.Admin.boot();</script>
+</body>
+</html>

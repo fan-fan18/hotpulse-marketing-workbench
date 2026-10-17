@@ -1,0 +1,581 @@
+{
+  "version": 1,
+  "updatedAt": null,
+  "prompt": {
+    "role": "你是电商媒体的资深微博内容运营，负责把热点新闻转化成可以直接发布的微博营销文案。",
+    "rules": [
+      "金额只能原样使用素材里给出的数字；素材没给的价格、折扣、销量、库存一律不许出现。",
+      "严禁使用广告法违禁词（最佳、第一、最低、绝对、永久、百分百等）。",
+      "写完自己数一遍，超出 {{字数上限}} 字就删，宁可少写一个卖点也不能超；也不要少于 {{字数下限}} 字。"
+    ],
+    "materialTemplate": "【热点素材】\n标题：{{热点标题}}\n摘要：{{热点摘要}}\n来源：{{来源}}｜热度值：{{热度值}}\n可用话题：{{话题标签}}\n\n【商品素材】\n{{商品清单}}\n\n【本次要求】\n主打语调：{{语调}}\n创作风格：{{创作风格}}\n风格要求：{{风格要求}}\n字数要求：{{字数下限}}–{{字数上限}} 字\n表情强度：{{表情强度}}\n可用金额（只能原样使用，不得新增）：{{可用金额}}\n{{附加要求}}",
+    "productTemplate": "{{序号}}. {{商品名称}}｜售价 {{售价}}｜原价 {{原价}}｜卖点：{{卖点列表}}",
+    "reworkInstruction": "下面是一版未通过的微博文案。\n请只针对【未通过清单】里的问题修改：不要改动商品、价格和话题，不要新增素材之外的任何信息，不要解释，也不要输出多个版本。\n字数、违禁词、编造价格、话题标签、互动引导这几类问题必须改掉。\n修改后只输出新的微博正文。",
+    "reviewPrompt": "你是微博营销文案评审。请对下面这条文案打分，四个维度各 1–5 分（1 最差，5 最好）：\n- hot：热点关联度（是真借上了这个热点，还是生硬拼接）\n- material：素材还原度（卖点和价格用得准不准，有没有瞎编）\n- appeal：传播吸引力（有没有钩子、有没有网感，让人愿意点开）\n- natural：语气自然度（像真人在发微博，还是一股机器味）\n\n只输出一个 JSON 对象，不要任何解释文字：\n{\"hot\":4,\"material\":5,\"appeal\":3,\"natural\":4,\"comment\":\"一句话点评\"}\n\n【素材】\n{{素材}}\n\n【待评审文案】\n{{文案}}",
+    "reworkTemperature": 0.2,
+    "reviewTemperature": 0.2,
+    "example": "【冷空气来袭】🥶 一夜降了 10 度，出门那下真的清醒。\n\n三合一防风冲锋衣 加绒可拆内胆，加绒内胆可拆、防风防泼水面料，通勤和周末都能穿。现在 ¥299（原价 ¥599）。\n\n你那边降了几度？评论区报个数 👇\n#冷空气来了# #一夜入秋#"
+  },
+  "styles": [
+    {
+      "id": "st_hot",
+      "name": "热点借势",
+      "requirement": "先接住热点情绪，再自然过渡到商品，重体验感。"
+    },
+    {
+      "id": "st_promo",
+      "name": "促销导向",
+      "requirement": "突出价格钩子与紧迫感，重转化，价格必须来自素材。"
+    },
+    {
+      "id": "st_talk",
+      "name": "互动话题",
+      "requirement": "用提问和共鸣把读者拉进评论区，互动引导要具体。"
+    },
+    {
+      "id": "st_deep",
+      "name": "深度种草",
+      "requirement": "讲清使用场景和细节体验，卖点落到具体感受上。"
+    }
+  ],
+  "tones": [
+    {
+      "id": "tn_hot",
+      "name": "热点借势"
+    },
+    {
+      "id": "tn_promo",
+      "name": "促销导向"
+    },
+    {
+      "id": "tn_talk",
+      "name": "互动话题"
+    },
+    {
+      "id": "tn_daily",
+      "name": "日常分享"
+    }
+  ],
+  "model": {
+    "mode": "mock",
+    "provider": "openai",
+    "baseUrl": "https://api.openai.com/v1",
+    "model": "gpt-4o-mini",
+    "apiKey": "",
+    "temperature": 0.85,
+    "priceIn": 0.15,
+    "priceOut": 0.6
+  },
+  "limits": {
+    "minWords": 60,
+    "maxWords": 320,
+    "maxTags": 3
+  },
+  "products": [
+    {
+      "id": "p1",
+      "name": "三合一防风冲锋衣 加绒可拆内胆",
+      "brand": "拓行 TROXON",
+      "cat": "服饰鞋包",
+      "price": 299,
+      "marketPrice": 599,
+      "stock": 1280,
+      "rating": 4.9,
+      "sales30d": 12480,
+      "conversion": 6.4,
+      "emoji": "🧥",
+      "sku": "TX-A219",
+      "gradient": "indigo",
+      "points": [
+        "加绒内胆可拆",
+        "防风防泼水面料",
+        "显瘦直筒版型"
+      ]
+    },
+    {
+      "id": "p2",
+      "name": "德绒半高领打底衫 恒温亲肤",
+      "brand": "暖叙 Nuanxu",
+      "cat": "服饰鞋包",
+      "price": 89,
+      "marketPrice": 199,
+      "stock": 3260,
+      "rating": 4.8,
+      "sales30d": 28600,
+      "conversion": 8.1,
+      "emoji": "👕",
+      "sku": "NX-DR08",
+      "gradient": "indigo",
+      "points": [
+        "德绒自发热",
+        "半高领护脖子",
+        "洗 30 次不变形"
+      ]
+    },
+    {
+      "id": "p3",
+      "name": "石墨烯蓄热冬被 双人加厚款",
+      "brand": "眠也 Sleepy",
+      "cat": "家居家纺",
+      "price": 369,
+      "marketPrice": 799,
+      "stock": 860,
+      "rating": 4.9,
+      "sales30d": 6420,
+      "conversion": 4.8,
+      "emoji": "🛏️",
+      "sku": "MY-GR12",
+      "gradient": "indigo",
+      "points": [
+        "石墨烯升温快 1.8 倍",
+        "A 类母婴级面料",
+        "整被可机洗不跑绒"
+      ]
+    },
+    {
+      "id": "p4",
+      "name": "迷你桌面暖风机 静音速热",
+      "brand": "小暖星球",
+      "cat": "家用电器",
+      "price": 129,
+      "marketPrice": 249,
+      "stock": 2140,
+      "rating": 4.7,
+      "sales30d": 15800,
+      "conversion": 5.6,
+      "emoji": "🔥",
+      "sku": "XN-HF03",
+      "gradient": "indigo",
+      "points": [
+        "3 秒速热",
+        "运行仅 38dB",
+        "倾倒自动断电"
+      ]
+    },
+    {
+      "id": "p5",
+      "name": "恒温电热水杯 316 不锈钢 500ml",
+      "brand": "汤叙",
+      "cat": "家用电器",
+      "price": 159,
+      "marketPrice": 299,
+      "stock": 1560,
+      "rating": 4.8,
+      "sales30d": 9340,
+      "conversion": 5.1,
+      "emoji": "🥤",
+      "sku": "TX-HC50",
+      "gradient": "indigo",
+      "points": [
+        "55℃ 恒温一整天",
+        "316 不锈钢内胆",
+        "烧水保温一杯搞定"
+      ]
+    },
+    {
+      "id": "p6",
+      "name": "磁吸无线充电宝 10000mAh 超薄款",
+      "brand": "极充 POWGO",
+      "cat": "数码配件",
+      "price": 199,
+      "marketPrice": 329,
+      "stock": 1980,
+      "rating": 4.8,
+      "sales30d": 21600,
+      "conversion": 7.2,
+      "emoji": "🔋",
+      "sku": "PG-MG10",
+      "gradient": "indigo",
+      "points": [
+        "磁吸即充不用线",
+        "8mm 超薄可上飞机",
+        "20W 快充不发烫"
+      ]
+    },
+    {
+      "id": "p7",
+      "name": "液态硅胶防摔手机壳 亲肤手感",
+      "brand": "壳语",
+      "cat": "数码配件",
+      "price": 39,
+      "marketPrice": 99,
+      "stock": 6420,
+      "rating": 4.7,
+      "sales30d": 46800,
+      "conversion": 9.6,
+      "emoji": "📱",
+      "sku": "KY-LS01",
+      "gradient": "indigo",
+      "points": [
+        "镜头全包防摔",
+        "亲肤不沾指纹",
+        "9 色可选"
+      ]
+    },
+    {
+      "id": "p8",
+      "name": "氮化镓充电器 65W 双口快充",
+      "brand": "极充 POWGO",
+      "cat": "数码配件",
+      "price": 89,
+      "marketPrice": 159,
+      "stock": 2480,
+      "rating": 4.9,
+      "sales30d": 18200,
+      "conversion": 6.8,
+      "emoji": "🔌",
+      "sku": "PG-GaN65",
+      "gradient": "indigo",
+      "points": [
+        "一个头搞定两台设备",
+        "比原装小 42%",
+        "智能分配功率"
+      ]
+    },
+    {
+      "id": "p9",
+      "name": "便携折叠露营椅 承重 150kg",
+      "brand": "野行 WILDGO",
+      "cat": "户外运动",
+      "price": 129,
+      "marketPrice": 249,
+      "stock": 1120,
+      "rating": 4.8,
+      "sales30d": 8760,
+      "conversion": 5.4,
+      "emoji": "🪑",
+      "sku": "WG-C12",
+      "gradient": "indigo",
+      "points": [
+        "3 秒展开",
+        "承重 150kg 不晃",
+        "收纳仅水瓶大小"
+      ]
+    },
+    {
+      "id": "p10",
+      "name": "轻量黑胶天幕帐篷 防晒防雨",
+      "brand": "野行 WILDGO",
+      "cat": "户外运动",
+      "price": 469,
+      "marketPrice": 899,
+      "stock": 520,
+      "rating": 4.8,
+      "sales30d": 3120,
+      "conversion": 3.9,
+      "emoji": "⛺",
+      "sku": "WG-TT21",
+      "gradient": "indigo",
+      "points": [
+        "UPF50+ 黑胶防晒",
+        "单人 10 分钟搭好",
+        "地钉风绳全配齐"
+      ]
+    },
+    {
+      "id": "p11",
+      "name": "316 焖烧保温杯 12 小时控温",
+      "brand": "汤叙",
+      "cat": "家居家纺",
+      "price": 119,
+      "marketPrice": 239,
+      "stock": 1720,
+      "rating": 4.9,
+      "sales30d": 11200,
+      "conversion": 6.1,
+      "emoji": "🍵",
+      "sku": "TX-MB12",
+      "gradient": "indigo",
+      "points": [
+        "12 小时保温",
+        "焖粥泡茶两用",
+        "茶漏可拆洗"
+      ]
+    },
+    {
+      "id": "p12",
+      "name": "老字号纯梨熬制秋梨膏 300g",
+      "brand": "润和堂",
+      "cat": "食品生鲜",
+      "price": 79,
+      "marketPrice": 129,
+      "stock": 2860,
+      "rating": 4.9,
+      "sales30d": 16400,
+      "conversion": 7.4,
+      "emoji": "🍐",
+      "sku": "RHT-QG30",
+      "gradient": "indigo",
+      "points": [
+        "配料只有梨和冰糖",
+        "温水一冲即饮",
+        "独立小包便携"
+      ]
+    },
+    {
+      "id": "p13",
+      "name": "罗汉果金银花润喉茶 独立装 30 袋",
+      "brand": "润和堂",
+      "cat": "食品生鲜",
+      "price": 59,
+      "marketPrice": 118,
+      "stock": 3420,
+      "rating": 4.8,
+      "sales30d": 21800,
+      "conversion": 8.3,
+      "emoji": "🫖",
+      "sku": "RHT-CH13",
+      "gradient": "indigo",
+      "points": [
+        "0 蔗糖不齁甜",
+        "独立三角包",
+        "一泡即出味"
+      ]
+    },
+    {
+      "id": "p14",
+      "name": "玻尿酸密集补水面膜 20 片装",
+      "brand": "素研 SUYAN",
+      "cat": "美妆个护",
+      "price": 99,
+      "marketPrice": 199,
+      "stock": 4260,
+      "rating": 4.8,
+      "sales30d": 24300,
+      "conversion": 7.9,
+      "emoji": "🧖",
+      "sku": "SY-FM20",
+      "gradient": "indigo",
+      "points": [
+        "5 重玻尿酸",
+        "膜布贴脸不滑落",
+        "冷藏后急救提亮"
+      ]
+    },
+    {
+      "id": "p15",
+      "name": "熬夜急救紧致眼霜 15ml",
+      "brand": "素研 SUYAN",
+      "cat": "美妆个护",
+      "price": 189,
+      "marketPrice": 359,
+      "stock": 940,
+      "rating": 4.7,
+      "sales30d": 7600,
+      "conversion": 4.6,
+      "emoji": "👁️",
+      "sku": "SY-YE15",
+      "gradient": "indigo",
+      "points": [
+        "咖啡因快速消肿",
+        "自带冰感按摩头",
+        "早晚可用不搓泥"
+      ]
+    },
+    {
+      "id": "p16",
+      "name": "客制化机械键盘 87 键 三模",
+      "brand": "键语 KEYSELF",
+      "cat": "数码配件",
+      "price": 359,
+      "marketPrice": 599,
+      "stock": 680,
+      "rating": 4.8,
+      "sales30d": 5240,
+      "conversion": 4.2,
+      "emoji": "⌨️",
+      "sku": "KS-87T",
+      "gradient": "indigo",
+      "points": [
+        "三模一键切换",
+        "Gasket 软弹手感",
+        "热插拔可换轴"
+      ]
+    },
+    {
+      "id": "p17",
+      "name": "PCIe4.0 固态硬盘 1TB 读速 7000MB/s",
+      "brand": "极充 POWGO",
+      "cat": "数码配件",
+      "price": 429,
+      "marketPrice": 699,
+      "stock": 430,
+      "rating": 4.9,
+      "sales30d": 3860,
+      "conversion": 3.6,
+      "emoji": "💽",
+      "sku": "PG-SSD1T",
+      "gradient": "indigo",
+      "points": [
+        "读速 7000MB/s",
+        "5 年质保 600TBW",
+        "附散热马甲"
+      ]
+    },
+    {
+      "id": "p18",
+      "name": "静音主动降噪耳机 45 小时续航",
+      "brand": "声屿 SOUNDISLE",
+      "cat": "数码配件",
+      "price": 269,
+      "marketPrice": 499,
+      "stock": 1340,
+      "rating": 4.7,
+      "sales30d": 9800,
+      "conversion": 5.2,
+      "emoji": "🎧",
+      "sku": "SD-ANC45",
+      "gradient": "indigo",
+      "points": [
+        "-42dB 主动降噪",
+        "45 小时长续航",
+        "双设备同时连接"
+      ]
+    },
+    {
+      "id": "p19",
+      "name": "加厚珊瑚绒居家睡衣套装",
+      "brand": "暖叙 Nuanxu",
+      "cat": "服饰鞋包",
+      "price": 149,
+      "marketPrice": 299,
+      "stock": 2240,
+      "rating": 4.8,
+      "sales30d": 13600,
+      "conversion": 6.6,
+      "emoji": "🧸",
+      "sku": "NX-SP24",
+      "gradient": "indigo",
+      "points": [
+        "加厚珊瑚绒",
+        "袖口裤脚收口",
+        "男女同款可外穿"
+      ]
+    },
+    {
+      "id": "p20",
+      "name": "便携折叠收纳箱 55L 车载款",
+      "brand": "野行 WILDGO",
+      "cat": "户外运动",
+      "price": 69,
+      "marketPrice": 139,
+      "stock": 3180,
+      "rating": 4.7,
+      "sales30d": 19400,
+      "conversion": 7.8,
+      "emoji": "🧳",
+      "sku": "WG-BX55",
+      "gradient": "indigo",
+      "points": [
+        "折叠后仅 5cm 厚",
+        "承重 80kg 可坐",
+        "防水内衬易擦"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "id": "src_weather",
+      "name": "中国天气网",
+      "type": "builtin",
+      "url": "http://www.weather.com.cn/",
+      "enabled": true,
+      "note": "民生 / 天气类新闻源"
+    },
+    {
+      "id": "src_weibo",
+      "name": "微博热搜榜",
+      "type": "builtin",
+      "url": "https://s.weibo.com/top/summary",
+      "enabled": true,
+      "note": "公开热榜（原型演示用）"
+    },
+    {
+      "id": "src_sina",
+      "name": "新浪科技",
+      "type": "builtin",
+      "url": "https://tech.sina.com.cn/",
+      "enabled": true,
+      "note": "科技数码类新闻源"
+    },
+    {
+      "id": "src_ctrip",
+      "name": "携程研究院",
+      "type": "builtin",
+      "url": "https://research.ctrip.com/",
+      "enabled": true,
+      "note": "出行旅游类数据源"
+    },
+    {
+      "id": "src_xhs",
+      "name": "小红书趋势",
+      "type": "builtin",
+      "url": "https://www.xiaohongshu.com/explore",
+      "enabled": true,
+      "note": "社区趋势（原型演示用）"
+    },
+    {
+      "id": "src_qbit",
+      "name": "量子位",
+      "type": "builtin",
+      "url": "https://www.qbitai.com/",
+      "enabled": true,
+      "note": "AI / 科技媒体"
+    },
+    {
+      "id": "src_health",
+      "name": "人民日报健康",
+      "type": "builtin",
+      "url": "https://www.people.com.cn/",
+      "enabled": true,
+      "note": "健康养生类新闻源"
+    },
+    {
+      "id": "src_eo",
+      "name": "经济观察报",
+      "type": "builtin",
+      "url": "http://www.eeo.com.cn/",
+      "enabled": true,
+      "note": "商业消费类媒体"
+    },
+    {
+      "id": "src_custom_demo",
+      "name": "行业媒体订阅（示例）",
+      "type": "custom",
+      "url": "https://example.com/rss/ecommerce",
+      "enabled": false,
+      "note": "运营自定义订阅源示例"
+    }
+  ],
+  "riskRules": {
+    "forbidden": [
+      "灾难事故（伤亡、失联、事故原因未明）",
+      "公共安全事件（案件侦办中、官方通报前）",
+      "医疗与药品功效宣称",
+      "涉政、涉宗教、涉民族敏感话题",
+      "负面舆论与维权争议"
+    ],
+    "manual": [
+      "重大体育赛事结果（胜负情绪易引发对立）",
+      "娱乐明星争议（存在反转风险）",
+      "节庆与纪念日（需注意口径）",
+      "价格与促销政策（以官方活动页为准）"
+    ]
+  },
+  "evalConfig": {
+    "weights": {
+      "machine": 0.5,
+      "review": 0.5
+    },
+    "concurrency": 3,
+    "repeats": 1,
+    "enableReview": false,
+    "autoRework": true,
+    "maxReworkRounds": 2,
+    "cases": []
+  },
+  "ui": {
+    "adminPage": "overview",
+    "view": "table"
+  }
+}

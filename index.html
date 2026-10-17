@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>热点引擎 HotPulse · 电商媒体热点营销工作台</title>
+<link rel="stylesheet" href="assets/css/styles.css" />
+</head>
+<body>
+
+<!-- ============ 顶部导航栏 ============ -->
+<header class="topbar">
+  <div class="topbar-left">
+    <div class="logo">
+      <span class="logo-mark">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 4 13.2h5.2L8.6 22 20 10.4h-5.6L15.6 2z"/></svg>
+      </span>
+      <span class="logo-text">
+        <strong>热点引擎</strong>
+        <em>HotPulse</em>
+      </span>
+      <span class="tag-demo">Demo</span>
+    </div>
+    <nav class="top-nav">
+      <a class="active" href="javascript:void(0)">营销工作台</a>
+      <a href="javascript:void(0)">商品库</a>
+      <a href="javascript:void(0)">内容中心</a>
+      <a href="javascript:void(0)">数据看板</a>
+    </nav>
+  </div>
+
+  <div class="topbar-right">
+    <div class="env-pill" id="envPill" title="正在检测本地服务端…">
+      <span class="pulse-dot"></span>检查服务状态…
+    </div>
+    <button class="icon-btn" id="bellBtn" title="消息通知">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v3.6L4.5 15.3A1 1 0 0 0 5.4 17h13.2a1 1 0 0 0 .9-1.7L18 12.6V9a6 6 0 0 0-6-6Zm0 18a3 3 0 0 0 2.8-2H9.2A3 3 0 0 0 12 21Z"/></svg>
+      <span class="dot"></span>
+    </button>
+
+    <div class="user-wrap" id="userWrap">
+      <button class="user" id="userBtn" aria-haspopup="true" aria-expanded="false">
+        <span class="avatar">林</span>
+        <span class="user-meta">
+          <b>林晓棠</b>
+          <i><span class="online-dot"></span>已登录 · 运营主编</i>
+        </span>
+        <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5z"/></svg>
+      </button>
+      <div class="user-menu" id="userMenu" hidden>
+        <div class="user-menu-head">
+          <span class="avatar lg">林</span>
+          <div>
+            <b>林晓棠</b>
+            <i>linxiaotang@shopmedia.cn</i>
+          </div>
+        </div>
+        <button type="button">账号信息</button>
+        <button type="button">团队与权限</button>
+        <button type="button">接口配置（LLM / Coze）</button>
+        <button type="button" class="danger">退出登录</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- ============ 左侧流程导航 ============ -->
+  <aside class="sidebar">
+    <div class="sidebar-head">
+      <span>营销流程</span>
+      <em>5 步闭环</em>
+    </div>
+    <ol class="step-nav" id="stepNav"></ol>
+
+    <div class="sidebar-foot">
+      <div class="progress-head">
+        <span>流程完成度</span><b id="flowPercent">0%</b>
+      </div>
+      <div class="progress-track"><span id="flowBar" style="width:0%"></span></div>
+      <p class="sidebar-tip" id="flowTip">请先在 Step 1 选择一个爆款热点。</p>
+    </div>
+  </aside>
+
+  <!-- ============ 右侧核心工作区 ============ -->
+  <main class="workspace">
+    <!-- 全局上下文条：保证 5 步之间数据上下文连贯 -->
+    <div class="context-bar" id="contextBar"></div>
+
+    <!-- ---------- Step 1 新闻抓取 ---------- -->
+    <section class="view" id="view-1">
+      <div class="view-head">
+        <div>
+          <h1>新闻抓取</h1>
+          <p class="sub">实时聚合全网电商相关热点，挑选一个高潜热点作为本次营销主线。</p>
+        </div>
+        <div class="head-actions">
+          <label class="switch">
+            <input type="checkbox" id="autoRefresh" checked />
+            <span class="track"></span>
+            <span class="switch-label">自动刷新 · 5 分钟</span>
+          </label>
+          <button class="btn primary" id="fetchBtn">
+            <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4V1L7 6l5 5V8a4 4 0 1 1-4 4H6a6 6 0 1 0 6-8Z"/></svg>
+            一键抓取
+          </button>
+        </div>
+      </div>
+
+      <div class="stat-row" id="newsStats"></div>
+
+      <div class="card filter-card">
+        <div class="filter-row">
+          <div class="field search">
+            <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4a6 6 0 1 0 3.7 10.7l4.3 4.3 1.4-1.4-4.3-4.3A6 6 0 0 0 10 4Zm0 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8Z"/></svg>
+            <input id="newsKeyword" type="text" placeholder="搜索热点关键词、品类或来源…" />
+          </div>
+          <div class="field">
+            <label>时间范围</label>
+            <select id="newsTime">
+              <option value="all">最近 24 小时</option>
+              <option value="6">最近 6 小时</option>
+              <option value="1">最近 1 小时</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>来源</label>
+            <select id="newsSource">
+              <option value="all">全部来源</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>排序</label>
+            <select id="newsSort">
+              <option value="heat">按热度值</option>
+              <option value="growth">按增速</option>
+              <option value="time">按时间</option>
+            </select>
+          </div>
+        </div>
+        <div class="chip-row" id="newsCats"></div>
+      </div>
+
+      <div class="list-head">
+        <h2>实时热点列表 <em id="newsCount"></em></h2>
+        <span class="hint">点击卡片即选中该热点，后续步骤将沿用此上下文</span>
+      </div>
+      <div class="news-list" id="newsList"></div>
+    </section>
+
+    <!-- ---------- Step 2 建议匹配商品 ---------- -->
+    <section class="view" id="view-2" hidden>
+      <div class="view-head">
+        <div>
+          <h1>建议匹配商品</h1>
+          <p class="sub">系统基于「热点语义 + 商品标签 + 近期转化数据」自动推荐关联商品。</p>
+        </div>
+        <div class="head-actions">
+          <button class="btn ghost" id="rematchBtn">
+            <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4V1L7 6l5 5V8a4 4 0 1 1-4 4H6a6 6 0 1 0 6-8Z"/></svg>
+            重新匹配
+          </button>
+          <button class="btn primary" data-goto="3">下一步：匹配商品</button>
+        </div>
+      </div>
+
+      <div class="card hot-brief" id="hotBrief"></div>
+
+      <div class="match-toolbar">
+        <div class="match-summary" id="matchSummary"></div>
+        <div class="seg" id="matchSortSeg">
+          <button class="active" data-sort="score">匹配度</button>
+          <button data-sort="gmv">带货潜力</button>
+          <button data-sort="price">价格</button>
+        </div>
+      </div>
+
+      <div class="product-grid" id="matchGrid"></div>
+      <div class="sticky-actions">
+        <span class="picked" id="pickedHint2">已选 0 件商品</span>
+        <button class="btn ghost" data-goto="1">返回热点</button>
+        <button class="btn primary" data-goto="3">进入深度匹配</button>
+      </div>
+    </section>
+
+    <!-- ---------- Step 3 匹配商品 ---------- -->
+    <section class="view" id="view-3" hidden>
+      <div class="view-head">
+        <div>
+          <h1>匹配商品</h1>
+          <p class="sub">从商品库中手动 / 深度筛选，绑定本次热点营销的商品组合。</p>
+        </div>
+        <div class="head-actions">
+          <button class="btn ghost" id="resetFilter">重置筛选</button>
+          <button class="btn primary" data-goto="4">下一步：创作文案</button>
+        </div>
+      </div>
+
+      <div class="split">
+        <div class="split-main">
+          <div class="card filter-card">
+            <div class="filter-row">
+              <div class="field search">
+                <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4a6 6 0 1 0 3.7 10.7l4.3 4.3 1.4-1.4-4.3-4.3A6 6 0 0 0 10 4Zm0 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8Z"/></svg>
+                <input id="libKeyword" type="text" placeholder="搜索商品名称 / 品牌 / SKU…" />
+              </div>
+              <div class="field">
+                <label>价格区间</label>
+                <div class="range-inputs">
+                  <input id="priceMin" type="number" placeholder="0" />
+                  <span>—</span>
+                  <input id="priceMax" type="number" placeholder="3000" />
+                </div>
+              </div>
+              <div class="field">
+                <label>最低评分</label>
+                <select id="libRating">
+                  <option value="0">不限</option>
+                  <option value="4.5">4.5 分以上</option>
+                  <option value="4.8">4.8 分以上</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>排序</label>
+                <select id="libSort">
+                  <option value="match">综合匹配度</option>
+                  <option value="sales">近 30 天销量</option>
+                  <option value="conversion">转化率</option>
+                  <option value="stock">库存</option>
+                </select>
+              </div>
+            </div>
+            <label class="checkline">
+              <input type="checkbox" id="onlyStock" />
+              <span>仅显示库存充足（&gt; 500 件）且近 30 天有动销的商品</span>
+            </label>
+            <div class="chip-row" id="libCats"></div>
+          </div>
+
+          <div class="table-card">
+            <div class="table-wrap">
+              <table class="table" id="libTable">
+                <thead>
+                  <tr>
+                    <th class="col-check"><input type="checkbox" id="checkAll" /></th>
+                    <th>商品</th>
+                    <th>类目</th>
+                    <th class="num">价格</th>
+                    <th class="num">匹配度</th>
+                    <th class="num">近30天销量</th>
+                    <th class="num">库存</th>
+                    <th class="num">评分</th>
+                    <th class="col-act">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="libBody"></tbody>
+              </table>
+            </div>
+            <div class="empty" id="libEmpty" hidden>没有符合条件的商品，试着放宽筛选条件。</div>
+          </div>
+        </div>
+
+        <aside class="split-side">
+          <div class="card side-card">
+            <div class="side-head">
+              <h3>已绑定商品库</h3>
+              <span class="count-badge" id="bindCount">0</span>
+            </div>
+            <div class="bind-list" id="bindList"></div>
+            <p class="side-note">建议绑定 1–3 件商品：1 件主推 + 1–2 件凑单/加购，微博文案转化效果最佳。</p>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ---------- Step 4 创作文案 ---------- -->
+    <section class="view" id="view-4" hidden>
+      <div class="view-head">
+        <div>
+          <h1>创作文案</h1>
+          <p class="sub">LLM 结合「热点语境 + 商品卖点」生成微博风格文案，支持多版本微调。</p>
+        </div>
+        <div class="head-actions">
+          <button class="btn ghost" id="regenerateAll">重新生成全部</button>
+          <button class="btn primary" data-goto="5">下一步：审核并发送</button>
+        </div>
+      </div>
+
+      <div class="split">
+        <div class="split-side left">
+          <div class="card side-card">
+            <div class="side-head"><h3>生成参数</h3></div>
+            <div class="param-block">
+              <label class="param-label">主打语调 <em>来自后台的语调预设</em></label>
+              <select class="text-input" id="tonePick"></select>
+            </div>
+            <div class="param-block">
+              <label class="param-label">创作风格 <em id="styleHint">每个风格产出一个候选版本</em></label>
+              <div class="style-grid" id="styleGrid">
+                <div class="empty-mini" style="grid-column:1/-1">正在读取后台的创作风格…</div>
+              </div>
+            </div>
+            <div class="param-block">
+              <label class="param-label">Emoji 强度 <em id="emojiVal">适中</em></label>
+              <input type="range" id="emojiRange" min="0" max="2" step="1" value="1" />
+            </div>
+            <div class="param-block">
+              <label class="param-label">话题标签 <em>建议引用热点同款话题</em></label>
+              <div class="tag-picks" id="tagPicks"></div>
+              <input class="text-input" id="customTag" type="text" placeholder="自定义话题，回车添加，如 #秋天第一件外套#" />
+            </div>
+            <div class="param-block">
+              <label class="param-label">卖点侧重</label>
+              <div class="point-picks" id="pointPicks"></div>
+            </div>
+            <div class="param-block">
+              <label class="param-label">附加要求（可选）</label>
+              <textarea id="extraPrompt" class="text-area" rows="3" placeholder="例如：面向 25–35 岁女性，语气轻松，突出「当晚发货」…"></textarea>
+            </div>
+            <div class="param-block">
+              <label class="param-label">模型 <em id="quickModelHint">与后台共用同一份配置</em></label>
+              <div class="quick-model">
+                <select class="text-input" id="quickMode"></select>
+                <input class="text-input" id="quickModel" placeholder="模型名，如 gpt-4o-mini" />
+                <div class="quick-temp">
+                  <span>温度</span>
+                  <input class="text-input" id="quickTemp" type="number" step="0.05" min="0" max="2" />
+                  <em id="quickTempTip">创作 0.7–1.0</em>
+                </div>
+              </div>
+              <a class="quick-link" href="admin.html#/model" target="_blank" rel="noopener">去后台详细配置（服务商 / 密钥 / 测试连接）→</a>
+            </div>
+            <div class="param-block">
+              <label class="param-label">质量校验与自动返工 <em>与后台评测设置共用配置</em></label>
+              <label class="checkline" style="margin-top:0">
+                <input type="checkbox" id="autoRework" checked />
+                <span>生成后自动返工（校验没过就按清单改一版）</span>
+              </label>
+              <div class="quick-temp" style="margin-top:8px">
+                <span>最多</span>
+                <input class="text-input" id="reworkRounds" type="number" min="0" max="4" style="width:76px" />
+                <em>轮</em>
+              </div>
+              <div class="help" style="margin-top:6px">关掉后只做校验、不自动改；每个版本仍可单独点「一键修正」。</div>
+              <label class="checkline" style="margin-top:8px">
+                <input type="checkbox" id="autoReview" />
+                <span>生成后同时跑模型评审（四维打分 + 点评，会更慢一些）</span>
+              </label>
+              <div class="quick-temp" style="margin-top:8px">
+                <span>权重</span>
+                <em>机器</em>
+                <input class="text-input" id="wMachine" type="number" min="0" max="1" step="0.05" style="width:76px" />
+                <em>＋ 评审</em>
+                <input class="text-input" id="wReview" type="number" min="0" max="1" step="0.05" style="width:76px" />
+              </div>
+              <div class="help" style="margin-top:6px">两项自动归一化（例如 0.8 ＋ 0.2）。不启用模型评审时，综合分就等于机器校验分。</div>
+            </div>
+            <button class="btn primary block" id="generateBtn">
+              <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 9.6 8.4 3 11l6.6 2.6L12 20l2.4-6.4L21 11l-6.6-2.6z"/></svg>
+              生成文案
+            </button>
+            <p class="api-note">接口预留：<code>POST /api/llm/generate</code> · 可替换为 Coze 工作流</p>
+          </div>
+        </div>
+
+        <div class="split-main">
+          <div class="gen-state" id="genState"></div>
+          <div class="version-list" id="versionList"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- Step 5 审核并发送 ---------- -->
+    <section class="view" id="view-5" hidden>
+      <div class="view-head">
+        <div>
+          <h1>审核并发送</h1>
+          <p class="sub">确认微博卡片效果、完成合规审核，一键模拟发布。</p>
+        </div>
+        <div class="head-actions">
+          <button class="btn ghost" data-goto="4">返回修改文案</button>
+          <button class="btn primary" id="publishBtn">一键发送</button>
+        </div>
+      </div>
+
+      <div class="split">
+        <div class="split-main">
+          <div class="card">
+            <div class="card-head">
+              <h3>微博效果预览</h3>
+              <div class="review-state" id="reviewState"></div>
+            </div>
+            <div class="weibo-card" id="weiboCard"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h3>发布记录</h3><span class="hint">模拟数据</span></div>
+            <ul class="timeline" id="timeline"></ul>
+          </div>
+        </div>
+
+        <aside class="split-side">
+          <div class="card side-card">
+            <div class="side-head"><h3>合规审核</h3><span class="count-badge" id="riskBadge">—</span></div>
+            <ul class="check-list" id="checkList"></ul>
+            <div class="audit-actions">
+              <button class="btn ghost block" id="autoFixBtn" hidden>一键优化风险表述</button>
+              <button class="btn primary block" id="approveBtn">通过审核</button>
+            </div>
+          </div>
+
+          <div class="card side-card">
+            <div class="side-head"><h3>发布配置</h3></div>
+            <div class="param-block">
+              <label class="param-label">发布账号</label>
+              <select class="text-input" id="publishAccount">
+                <option>潮流好物研究所（主号 · 认证）</option>
+                <option>省钱小分队（矩阵号）</option>
+                <option>新品雷达站（矩阵号）</option>
+              </select>
+            </div>
+            <div class="param-block">
+              <label class="param-label">发布时间</label>
+              <select class="text-input" id="publishTime">
+                <option>立即发布</option>
+                <option>今日 20:00（流量高峰）</option>
+                <option>明日 12:00</option>
+              </select>
+            </div>
+            <label class="checkline">
+              <input type="checkbox" id="withLink" checked />
+              <span>附带商品橱窗链接（模拟）</span>
+            </label>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- 全局提示 & 弹窗 -->
+<div class="toast-wrap" id="toastWrap"></div>
+<div class="modal-mask" id="modalMask" hidden>
+  <div class="modal" role="dialog" aria-modal="true">
+    <h3 id="modalTitle">确认发布</h3>
+    <p id="modalText"></p>
+    <div class="modal-actions">
+      <button class="btn ghost" id="modalCancel">取消</button>
+      <button class="btn primary" id="modalOk">确认发送</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/core/config.js"></script>
+<script src="assets/js/core/products.js"></script>
+<script src="assets/js/core/prompt.js"></script>
+<script src="assets/js/core/llm.js"></script>
+<script src="assets/js/core/eval.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>
