@@ -19,7 +19,7 @@ window.HP = window.HP || {};
   }
   function gradientOf(p) {
     var g = (window.HP.Config && HP.Config.GRADIENTS) || {};
-    return g[(p && p.gradient) || 'indigo'] || g.indigo || 'linear-gradient(135deg,#eef0ff,#f7f4ff)';
+    return g[(p && p.gradient) || 'indigo'] || g.indigo || 'linear-gradient(135deg,#e8f3ec,#f5faf6)';
   }
   function discountOf(p) {
     var price = Number(p.price), market = Number(p.marketPrice);

@@ -35,7 +35,7 @@ HP.AdminPages = HP.AdminPages || {};
           return '<div class="row">' + MODES.map(function (x) {
             var on = m.mode === x.id;
             return '<div class="col"><button type="button" class="card-mini" data-mode="' + x.id + '" style="text-align:left;width:100%;' +
-              (on ? 'border-color:var(--brand);box-shadow:0 0 0 2px rgba(79,70,229,.12);background:#fafaff' : '') + '">' +
+              (on ? 'border-color:var(--brand);box-shadow:0 0 0 2px rgba(26,77,46,.12);background:#f7faf8' : '') + '">' +
               '<b style="display:block;font-size:13.5px;margin-bottom:4px">' + esc(x.name) + (on ? ' ✓ 当前' : '') + '</b>' +
               '<span class="help" style="display:block;margin:0">' + esc(x.desc) + '</span>' +
               (x.id === 'proxy' && noServer

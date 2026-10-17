@@ -13,7 +13,7 @@ window.HP = window.HP || {};
 
   /* 商品卡背景渐变预设（工作台与后台共用） */
   var GRADIENTS = {
-    indigo: 'linear-gradient(135deg,#eef0ff,#f7f4ff)',
+    indigo: 'linear-gradient(135deg,#e8f3ec,#f5faf6)',
     mint: 'linear-gradient(135deg,#e6f8f2,#f2fbf7)',
     peach: 'linear-gradient(135deg,#ffeee6,#fff5ef)',
     sky: 'linear-gradient(135deg,#e6f2ff,#f2f8ff)',
