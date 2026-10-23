@@ -1641,7 +1641,8 @@
       $('#batchStart').hidden = false;
       $('#batchStart').disabled = false;
       $('#batchStart').textContent = '再跑一批';
-      if (window.HP && HP.Workspace) HP.Workspace.batchDone(state.batch.tasks.length, state.batch.ok);
+      /* 中途停止时只记真正跑过的任务数，不把没派发的也算进去 */
+      if (window.HP && HP.Workspace) HP.Workspace.batchDone(state.batch.done, state.batch.ok);
       toast('批量完成：成功 ' + state.batch.ok + ' / ' + state.batch.tasks.length + ' 条' +
         (state.batch.stop ? '（中途停止，未派发的任务已取消）' : '') + '，结果已全部进入待审队列',
         state.batch.fail ? 'warn' : 'ok');
