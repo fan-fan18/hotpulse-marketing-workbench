@@ -49,6 +49,8 @@ async function waitFetched(page) {
 
 (async function run() {
   const { chromium } = loadPlaywright();
+  /* 热点池是本套件的夹具：先清空，保证"抓之前 0 条"可复现 */
+  try { fs.rmSync(path.join(ROOT, 'data', 'news.json'), { force: true }); } catch (e) {}
   const stub = spawn('node', [path.join(__dirname, 'stub-provider.js'), String(STUB_PORT)], { stdio: 'ignore' });
   const app = spawn('node', [path.join(ROOT, 'server', 'server.js'), String(APP_PORT)], { cwd: ROOT, stdio: 'ignore' });
   await new Promise(r => setTimeout(r, 1300));
@@ -202,7 +204,7 @@ async function waitFetched(page) {
   const toast2 = (await page2.locator('#toastWrap').innerText().catch(() => '')).replace(/\s+/g, ' ');
   check('服务端模式点「一键抓取」：真的抓到订阅条目并出现在列表里',
     nAfter === 3, '抓取后列表 ' + nAfter + ' 条（订阅源提供 3 条）');
-  check('提示里给出真实来源数与写入条数', /真抓取完成/.test(toast2) && /3 条条目/.test(toast2), toast2.slice(0, 70));
+  check('提示里给出真实来源数与热点池条数', /真抓取完成/.test(toast2) && /热点池共 3 条/.test(toast2), toast2.slice(0, 80));
   const srcNames = await page2.$$eval('.news-item .news-meta .src', els => els.map(e => e.textContent.trim()));
   check('列表里的新闻确实标着这个订阅源的名字',
     srcNames.length === 3 && srcNames.every(x => x === '验收订阅源'),
@@ -214,10 +216,10 @@ async function waitFetched(page) {
   check('统计卡跟着变成真实数字 3 条',
     Number(String(statAfter[0]).replace(/[^\d]/g, '')) === 3, '统计卡 ' + statAfter[0]);
 
-  const serverCfg = await getConfig();
-  const rssSrc = (serverCfg.sources || []).filter(s => s.id === 'src_acceptance_rss')[0] || {};
-  check('抓到的条目已写回服务端配置（刷新/换页面也不丢）',
-    (rssSrc.items || []).length === 3, '服务端配置里该来源存了 ' + (rssSrc.items || []).length + ' 条');
+  const pool = await (await fetch(APP + '/api/news')).json();
+  check('抓到的条目已落进服务端热点池 data/news.json（刷新/换页面也不丢）',
+    (pool.items || []).length === 3 && pool.stats.total === 3,
+    '热点池 ' + (pool.items || []).length + ' 条；runs ' + (pool.runs || []).length + ' 次');
   await page2.screenshot({ path: path.join(ROOT, 'work', 'shots', 'fetch-4-服务端真抓取.png') });
 
   /* 换一个页面重新打开，验证条目来自配置而不只是内存 */

@@ -64,7 +64,7 @@ async function draft(page) { return page.evaluate(() => window.HP.Admin.getDraft
   console.log('== 页面结构、合规提示与风险规则 ==');
   await page.goto(APP + '/admin.html#/sources');
   await page.waitForTimeout(1100);
-  check('来源页包含五个区块', (await page.locator('.sec').count()) === 5,
+  check('来源页包含六个区块（新增"定时抓取与热点池"）', (await page.locator('.sec').count()) === 6,
     (await page.locator('.sec-head h3').allInnerTexts()).join(' / '));
   const builtinRows = await page.locator('#sec-so-list tbody tr').count();
   check('列出了全部来源（内置 + 自定义）', builtinRows === original.sources.length,

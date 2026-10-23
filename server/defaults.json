@@ -574,6 +574,11 @@
     "maxReworkRounds": 2,
     "cases": []
   },
+  "fetch": {
+    "enabled": true,
+    "intervalMin": 10,
+    "keepDays": 7
+  },
   "ui": {
     "adminPage": "overview",
     "view": "table"

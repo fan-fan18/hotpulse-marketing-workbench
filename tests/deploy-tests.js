@@ -89,6 +89,11 @@ function restore() {
     check('/api/health 返回服务名与配置文件路径', h && h.ok && h.name === 'hotpulse-local' && /config\.json$/.test(h.configFile || ''),
       'name=' + (h && h.name) + '，port=' + (h && h.port));
 
+    const newsApi = json(await req('GET', '/api/news'));
+    check('GET /api/news 返回热点池（items + runs + stats）',
+      newsApi && newsApi.ok && Array.isArray(newsApi.items) && Array.isArray(newsApi.runs) && !!newsApi.stats,
+      'items=' + (newsApi.items || []).length + ' runs=' + (newsApi.runs || []).length);
+
     const g1 = await req('GET', '/api/config');
     const c1 = json(g1);
     const cfg = c1 && c1.config;
@@ -153,7 +158,8 @@ function restore() {
     out.numbers['备份保留'] = backups.length + ' 份';
 
     console.log('\n== 5. 静态资源收口（敏感路径不给下载） ==');
-    const blocked = ['/data/config.json', '/data/backups/', '/server/server.js', '/server/defaults.json',
+    const blocked = ['/data/config.json', '/data/backups/', '/data/news.json', '/server/server.js', '/server/defaults.json',
+      '/server/news.js', '/server/sources.js',
       '/tests/deploy-tests.js', '/scripts/gen-defaults.js', '/work/', '/outputs/', '/.test-tools/node_modules/'];
     let blockOk = 0;
     for (const p of blocked) {
@@ -161,7 +167,7 @@ function restore() {
       if (r.status === 403) blockOk++;
       else console.log('    ! ' + p + ' 期望 403，实际 ' + r.status);
     }
-    check('data/ server/ tests/ scripts/ work/ outputs/ 全部 403', blockOk === blocked.length,
+    check('data/ server/ tests/ scripts/ work/ outputs/ 全部 403（含 data/news.json、server/news.js）', blockOk === blocked.length,
       blockOk + '/' + blocked.length + ' 命中；抽查 /data/config.json → 403');
     const sample = await req('GET', '/data/config.json');
     check('被拦时返回可读说明而不是空白页', /Forbidden/.test(sample.body) && /不对静态访问开放/.test(sample.body), sample.body.slice(0, 60));

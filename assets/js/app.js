@@ -38,7 +38,13 @@
     review: { status: 'wait', published: false, checks: [], blocked: false },
     /* 统计一律来自真实数据：不再有写死的"累计抓取量" */
     stats: { lastFetch: null, lastFetchNote: '' },
-    logs: []
+    logs: [],
+    /* 运营效率：多选批量 / 待审队列 / 视图切换 / 服务端热点池 */
+    selectedNewsIds: [],
+    view: 'work',
+    queueId: null,
+    serverNews: { items: [], stats: null, runs: [] },
+    batch: { open: false, running: false, tasks: [], done: 0, ok: 0, fail: 0, stop: false, styleIds: [] }
   };
 
   /* ---------------- 工具 ---------------- */
@@ -97,7 +103,48 @@
     enabledSources().forEach(s => {
       (s.items || []).slice(0, 10).forEach((it, i) => custom.push(customNews(s, it, i)));
     });
+    /* 服务端热点池：已经去过重的权威数据；按标题指纹再兜一次，避免和上面的条目重复 */
+    const seen = new Set(builtin.concat(custom).map(n => HP.Workflow.fingerprint(n.title)));
+    (state.serverNews.items || []).forEach(function (it, i) {
+      /* 来源被停用/删除后，它池子里的旧条目不再出现在工作台 */
+      if (it.sourceId && !on[it.sourceId]) return;
+      const fp = HP.Workflow.fingerprint(it.title);
+      if (!fp || seen.has(fp)) return;
+      seen.add(fp);
+      custom.push(serverNewsItem(it, i));
+    });
     return builtin.concat(custom);
+  }
+
+  /* 把服务端热点池的条目转成工作台列表用的形状（含趋势采样） */
+  function serverNewsItem(it, i) {
+    const kws = keywordsFrom(it.title);
+    const hs = (it.history || []).map(x => Number(x.heat) || 0);
+    const hi = Math.max.apply(null, hs.concat([1]));
+    const lo = Math.min.apply(null, hs.concat([hi]));
+    const spark = hs.slice(-8).map(v => Math.round(((v - lo) / (hi - lo || 1)) * 60 + 40));
+    const tr = HP.Workflow.trendOf(it.history || []);
+    const mins = it.lastSeen ? Math.max(1, Math.round((Date.now() - new Date(it.lastSeen).getTime()) / 60000)) : 30;
+    return {
+      id: it.id,
+      sourceId: it.sourceId,
+      cat: '订阅抓取',
+      source: it.source || '订阅源',
+      time: mins < 60 ? mins + ' 分钟前' : Math.round(mins / 60) + ' 小时前',
+      minutesAgo: mins,
+      title: it.title,
+      summary: it.summary || ('来自订阅源「' + (it.source || '') + '」的条目。'),
+      heat: Number(it.heat) || 700,
+      growth: tr.label === 'new' ? 6 : Math.max(0, Math.round(tr.pct)),
+      spark: spark,
+      history: it.history || [],
+      seenCount: it.seenCount || 1,
+      trendLabel: tr.label,
+      keywords: kws,
+      tags: kws.slice(0, 2),
+      topics: ['#' + (kws[0] || '热点') + '#'],
+      link: it.link || ''
+    };
   }
 
   function refreshNews() {
@@ -107,6 +154,19 @@
       const old = prev[n.id];
       return old ? Object.assign({}, n, { heat: old.heat, growth: old.growth }) : n;
     });
+  }
+
+  /* 服务端热点池：定时抓取 + 去重 + 热度采样的结果（没有服务端时保持为空，不伪造） */
+  function refreshServerNews() {
+    if (!HP.Config.isServer()) {
+      state.serverNews = { items: [], stats: null, runs: [] };
+      return Promise.resolve(state.serverNews);
+    }
+    return fetch('api/news').then(r => r.json()).then(function (d) {
+      if (!d || !d.ok) return state.serverNews;
+      state.serverNews = { items: d.items || [], stats: d.stats || null, runs: d.runs || [] };
+      return state.serverNews;
+    }).catch(function () { return state.serverNews; });
   }
   const getNews = id => state.news.find(n => n.id === id) || null;
   const getProduct = id => allProducts().find(p => p.id === id) || null;
@@ -390,17 +450,25 @@
         $('#newsList').innerHTML = '<div class="empty-state"><b>没有匹配的热点</b>试着调整关键词或切换类目。</div>';
       }
       wireNewsEmptyActions();
+      renderMultiBar();
       return;
     }
     $('#newsList').innerHTML = list.map((n, i) => {
       const selected = state.selectedNewsId === n.id;
+      const checked = state.selectedNewsIds.indexOf(n.id) > -1;
       const rankCls = i === 0 ? 'top' : i === 1 ? 'top2' : i === 2 ? 'top3' : '';
-      return '<article class="news-item ' + (selected ? 'selected' : '') + '" data-id="' + n.id + '">' +
+      const tr = HP.Workflow.trendOf(n.history || []);
+      const trLabel = n.trendLabel || tr.label;
+      const trCls = trLabel === 'down' ? 'trend-down' : (trLabel === 'flat' || trLabel === 'new') ? 'trend-flat' : 'trend-up';
+      const trTxt = (n.history && n.history.length > 1) ? HP.Workflow.trendText(tr) : ('↑ ' + n.growth + '% 增速');
+      const seen = Number(n.seenCount) > 1 ? '<span class="seen-tag">被 ' + n.seenCount + ' 个来源抓到</span>' : '';
+      return '<article class="news-item ' + (selected ? 'selected' : '') + (checked ? ' multi' : '') + '" data-id="' + n.id + '">' +
+        '<input type="checkbox" class="news-check" data-check="' + n.id + '" title="勾选后可批量生成" ' + (checked ? 'checked' : '') + ' />' +
         '<span class="rank ' + rankCls + '">' + (i + 1) + '</span>' +
         '<div class="news-main">' +
           '<h3 class="news-title">' + markKeyword(n.title) + '</h3>' +
           '<div class="news-meta"><span class="src">' + esc(n.source) + '</span><span>' + esc(n.cat) + '</span><span>' + esc(n.time) + '</span>' +
-            '<span class="trend-up">↑ ' + n.growth + '% 增速</span></div>' +
+            '<span class="' + trCls + '">' + esc(trTxt) + '</span>' + seen + '</div>' +
           '<p class="news-summary">' + esc(n.summary) + '</p>' +
           '<div class="tagline">' + n.tags.map((t, ti) => '<span class="tag ' + (ti === 0 ? 'hot' : ti === 1 ? 'brand' : '') + '">' + esc(t) + '</span>').join('') +
             n.topics.map(t => '<span class="tag">' + esc(t) + '</span>').join('') + '</div>' +
@@ -408,17 +476,26 @@
         '<div class="news-right">' +
           '<div class="heat">' + n.heat + '<small>热度值</small></div>' + sparkHtml(n.spark) +
           '<span class="pick-badge">' + (selected ? '✓ 已选为本次热点' : '选为爆款热点') + '</span>' +
+          '<button class="btn ghost sm pool-add" data-pooladd="' + n.id + '">+ 选题池</button>' +
         '</div></article>';
     }).join('');
 
     $('#newsList').querySelectorAll('.news-item').forEach(item => {
-      item.addEventListener('click', () => selectNews(item.dataset.id));
+      item.addEventListener('click', e => {
+        const cb = e.target.closest ? e.target.closest('[data-check]') : null;
+        if (cb) { e.stopPropagation(); togglePick(cb.dataset.check); return; }
+        const pb = e.target.closest ? e.target.closest('[data-pooladd]') : null;
+        if (pb) { e.stopPropagation(); addToPool(pb.dataset.pooladd); return; }
+        selectNews(item.dataset.id);
+      });
     });
+    renderMultiBar();
   }
 
   function selectNews(id) {
     if (state.selectedNewsId === id) { goStep(2); return; }
     state.selectedNewsId = id;
+    state.queueId = null;
     state.candidates = []; state.bound = [];
     state.copy.versions = []; state.copy.selectedId = null; state.copy.tags = []; state.copy.points = [];
     state.review = { status: 'wait', published: false, checks: [], blocked: false };
@@ -495,41 +572,23 @@
         });
       }
 
-      /* 服务端模式：真抓 */
-      return fetch('api/sources/test', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sources: on })
-      })
+      /* 服务端模式：交给服务端热点池内核（真抓取 + 去重 + 热度采样 + 落盘） */
+      return fetch('api/news/refresh', { method: 'POST' })
         .then(r => r.json())
         .then(function (data) {
-          const results = (data && data.results) || [];
-          const okN = results.filter(r => r.ok).length;
-          const got = results.filter(r => (r.items || []).length);
-          const next = JSON.parse(JSON.stringify(HP.Config.get()));
-          let total = 0;
-          got.forEach(function (r) {
-            const s = (next.sources || []).filter(x => x.id === r.id)[0];
-            if (!s) return;
-            s.items = r.items.slice(0, 10).map(function (it) {
-              return { title: it.title, summary: it.summary || '', link: it.link || '', fetchedAt: new Date().toISOString() };
-            });
-            total += s.items.length;
+          if (!data || !data.ok) throw new Error((data && data.reason) || '抓取失败');
+          const run = data.run || {};
+          const added = run.added || 0, merged = run.merged || 0, total = run.total || 0;
+          const okN = run.okSources || 0, failedN = run.failedSources || 0;
+          return refreshServerNews().then(function () {
+            refreshNews();
+            state.stats.lastFetch = new Date();
+            state.stats.lastFetchNote = '服务端真抓取：新增 ' + added + ' · 合并 ' + merged + ' · 池内 ' + total;
+            rerenderStep1();
+            logEvent('抓取完成', '热点池：新增 ' + added + ' 条、合并重复 ' + merged + ' 条，池内共 ' + total + ' 条');
+            toast('真抓取完成：成功 ' + okN + ' 个来源、失败 ' + failedN + ' 个，本轮新增 ' + added + ' 条条目、合并 ' +
+              merged + ' 条重复（热点池共 ' + total + ' 条）', added ? 'ok' : 'warn');
           });
-          const write = got.length ? HP.Config.save(next).catch(() => null) : Promise.resolve(null);
-          return write
-            .then(() => HP.Config.load().catch(() => null))
-            .then(function () {
-              refreshNews();
-              state.stats.lastFetch = new Date();
-              state.stats.lastFetchNote = '服务端真抓取：成功 ' + okN + '/' + on.length + ' 个来源';
-              rerenderStep1();
-              if (got.length) {
-                logEvent('抓取完成', '真抓取 ' + on.length + ' 个来源，' + got.length + ' 个来源解析出 ' + total + ' 条条目');
-                toast('真抓取完成：' + okN + '/' + on.length + ' 个来源可访问，写入 ' + total + ' 条条目（来自 ' + got.length + ' 个订阅源）', 'ok');
-              } else {
-                toast('抓取完成：' + okN + '/' + on.length + ' 个来源可访问，但一条条目也没解析出来（公开热榜多为前端渲染，建议改用 RSS / JSON 订阅源）', 'warn');
-              }
-            });
         })
         .catch(function (e) {
           toast('抓取失败：' + ((e && e.message) || '未知原因'), 'warn');
@@ -1016,6 +1075,12 @@
         ' · ' + esc(modeLabel) + ' ' + unknownTip + '</span></div>';
       renderVersions(); renderFlow(); renderContextBar();
       renderQuickModel();
+      /* 运营效率指标：真实生成数 + 返工次数（数据看板用） */
+      if (window.HP && HP.Workspace) {
+        HP.Workspace.bump('generated', state.copy.versions.length);
+        const reworkedN = state.copy.versions.filter(x => x.rework && x.rework.acceptedRounds > 0).length;
+        if (reworkedN) HP.Workspace.bump('reworked', reworkedN);
+      }
       logEvent('已生成微博文案', '基于「' + news.keywords[0] + '」+「' + prod.name + '」，按 ' + styles.length + ' 个创作风格生成 ' + state.copy.versions.length + ' 个版本');
       if (after) after();
       });
@@ -1247,6 +1312,7 @@
       $('#reviewState').innerHTML = '<span class="state-pill wait">未审核</span>';
       $('#riskBadge').textContent = '—';
       $('#approveBtn').disabled = true; $('#publishBtn').disabled = true;
+      renderQueue();
       renderTimeline();
       return;
     }
@@ -1296,6 +1362,7 @@
     $('#publishBtn').disabled = state.review.published;
     $('#publishBtn').textContent = state.review.published ? '已发送' : '一键发送';
 
+    renderQueue();
     renderTimeline();
   }
 
@@ -1328,6 +1395,9 @@
   function approve() {
     if (state.review.blocked) { toast('存在高风险项，请先点击「一键优化风险表述」', 'warn'); return; }
     state.review.status = 'pass';
+    /* 这条文案来自待审队列时，把队列状态一起推进（指标只记一次） */
+    if (state.queueId && window.HP && HP.Workspace) HP.Workspace.setQueueStatus(state.queueId, '已通过');
+    else if (window.HP && HP.Workspace) HP.Workspace.bump('passed');
     const v = state.copy.versions.find(x => x.id === state.copy.selectedId);
     logEvent('合规审核通过', '审核人：林晓棠 · ' + v.label + ' 通过全部合规检查');
     renderStep5(); renderFlow(); renderContextBar();
@@ -1347,11 +1417,461 @@
         $('#publishBtn').disabled = true; $('#publishBtn').textContent = '发送中…';
         setTimeout(() => {
           state.review.published = true;
+          if (window.HP && HP.Workspace) {
+            if (state.queueId) HP.Workspace.setQueueStatus(state.queueId, '已发布');
+            else HP.Workspace.bump('published');
+            /* 选题池里这条热点标记成"已发"，内容中心的日历会跟着变 */
+            const hit = HP.Workspace.pool().filter(x => x.newsId === state.selectedNewsId && x.status !== '已发')[0];
+            if (hit) HP.Workspace.setPoolStatus(hit.id, '已发');
+          }
           logEvent('已发送到微博', account + ' · ' + time + ' · ' + v.label);
           renderStep5(); renderFlow(); renderContextBar();
           toast('发布成功（模拟）：' + account, 'ok');
         }, 1200);
       });
+  }
+
+  /* =========================================================
+     运营效率：多选批量 / 选题池 / 待审队列 / 视图切换
+     ========================================================= */
+  function togglePick(id) {
+    const i = state.selectedNewsIds.indexOf(id);
+    if (i > -1) state.selectedNewsIds.splice(i, 1); else state.selectedNewsIds.push(id);
+    renderNewsList();
+  }
+
+  function renderMultiBar() {
+    const bar = $('#multiBar');
+    if (!bar) return;
+    const n = state.selectedNewsIds.length;
+    bar.hidden = n === 0;
+    const c = $('#multiCount');
+    if (c) c.textContent = n;
+  }
+
+  /* 加入选题池：同一条热点已有未发布记录时不重复加，并提示撞车风险 */
+  function addToPool(id) {
+    const news = getNews(id);
+    if (!news) return;
+    if (!window.HP || !HP.Workspace) return;
+    /* 先看历史（加进去之后会和自己撞车），再入库 */
+    const cf = HP.Workspace.conflictsFor(news.id);
+    const r = HP.Workspace.addPool(news);
+    if (!r.ok) { toast('这条热点已经在选题池里了（当前状态：' + r.item.status + '）', 'warn'); return false; }
+    if (cf.length) {
+      toast('已加入选题池；注意：7 天内已有 ' + cf.length + ' 条同热点选题，建议换个角度', 'warn');
+    } else {
+      toast('已加入选题池，可在顶部「内容中心」排期', 'ok');
+    }
+    if (state.view === 'center' && HP.Views && HP.Views.center) HP.Views.center.render($('#view-center'));
+    return true;
+  }
+
+  /* ---------------- 批量生成 ---------------- */
+  function scoreCls(n) { return n == null ? 'mid' : n >= 90 ? 'hi' : n >= 70 ? 'mid' : 'low'; }
+
+  function openBatch() {
+    const picked = state.selectedNewsIds.slice();
+    if (!picked.length && state.selectedNewsId) picked.push(state.selectedNewsId);
+    if (!picked.length) { toast('先在 Step 1 勾选至少一条热点（卡片左侧的复选框）', 'warn'); return; }
+    state.batch.newsIds = picked;
+    state.batch.styleIds = (cfg().styles || []).map(s => s.id);
+    state.batch.done = 0; state.batch.ok = 0; state.batch.fail = 0;
+    state.batch.stop = false; state.batch.running = false;
+    renderBatchForm();
+    $('#batchResults').hidden = true;
+    $('#batchBody').innerHTML = '';
+    $('#batchProgress').hidden = true;
+    $('#batchStop').hidden = true;
+    $('#batchStart').hidden = false;
+    $('#batchStart').disabled = false;
+    $('#batchStart').textContent = '开始生成';
+    $('#batchMask').hidden = false;
+    batchEstimate();
+  }
+
+  function renderBatchForm() {
+    const newsList = state.batch.newsIds.map(getNews).filter(Boolean);
+    $('#batchNewsChips').innerHTML = newsList.length
+      ? newsList.map(n => '<label class="batch-chip on"><input type="checkbox" data-bnews="' + n.id + '" checked /><span>' +
+          esc(String(n.title).slice(0, 24)) + '</span></label>').join('')
+      : '<span class="muted">没有选中热点</span>';
+    $('#batchStyleChips').innerHTML = (cfg().styles || []).map(s =>
+      '<label class="batch-chip' + (state.batch.styleIds.indexOf(s.id) > -1 ? ' on' : '') + '"><input type="checkbox" data-bstyle="' + s.id + '" ' +
+      (state.batch.styleIds.indexOf(s.id) > -1 ? 'checked' : '') + ' /><span>' + esc(s.name) + '</span></label>').join('');
+  }
+
+  function batchEstimate() {
+    const n = state.batch.newsIds.length, s = state.batch.styleIds.length;
+    const conc = Math.min(6, Math.max(1, Number($('#batchConc').value) || 3));
+    const total = n * s;
+    const ms = HP.Workflow.estimateMs(total, conc, 2200);
+    $('#batchNewsHint').textContent = n + ' 条';
+    $('#batchEst').innerHTML = '<b>' + total + '</b> 个任务（' + n + ' 热点 × ' + s + ' 风格）· 并发 ' + conc +
+      ' · 预估约 ' + Math.max(1, Math.round(ms / 1000)) + ' 秒';
+    $('#batchStart').disabled = total === 0;
+    return total;
+  }
+
+  function batchRow(t, ok, note, score) {
+    const news = getNews(t.newsId), prod = getProduct(t.productId);
+    const style = (cfg().styles || []).filter(s => s.id === t.styleId)[0];
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td>' + esc(String((news && news.title) || t.newsId).slice(0, 18)) + '</td>' +
+      '<td>' + esc((style && style.name) || t.styleId) + '</td>' +
+      '<td>' + esc((prod && prod.name) || '—') + '</td>' +
+      '<td class="num"><span class="score-pill ' + scoreCls(score) + '">' + (score == null ? '—' : score) + '</span></td>' +
+      '<td class="' + (ok ? 'ok-cell' : 'fail-cell') + '">' + esc(note) + '</td>';
+    $('#batchBody').appendChild(tr);
+  }
+
+  function batchTick() {
+    const total = state.batch.tasks.length || 1;
+    const pct = Math.round(state.batch.done / total * 100);
+    const bar = $('#batchBar'); if (bar) bar.style.width = pct + '%';
+    const txt = $('#batchProgressTxt');
+    if (txt) txt.textContent = state.batch.done + ' / ' + state.batch.tasks.length + '（成功 ' + state.batch.ok + ' · 失败 ' + state.batch.fail + '）';
+  }
+
+  function runBatchTask(t) {
+    const conf = cfg();
+    const news = getNews(t.newsId), prod = getProduct(t.productId);
+    const style = (conf.styles || []).filter(s => s.id === t.styleId)[0];
+    if (!news || !style) {
+      state.batch.fail++; state.batch.done++;
+      batchRow(t, false, '热点或创作风格已不存在（可能刚被后台删掉）');
+      batchTick();
+      return Promise.resolve();
+    }
+    const products = prod ? [prod] : [];
+    const opt = {
+      style: style,
+      tone: state.copy.tone || ((conf.tones || [])[0] || {}).name || '',
+      tags: (news.topics || []).slice(0, 2),
+      emojiLevel: 1,
+      extra: ''
+    };
+    const compiled = HP.Prompt.compile(news, products, opt);
+    const material = HP.Eval.materialFrom(news, products, opt);
+    return HP.LLM.call({
+      system: compiled.system, user: compiled.material, mode: conf.model.mode,
+      temperature: conf.model.temperature,
+      meta: Object.assign({}, opt, {
+        kind: 'compose', news: news, products: products, limits: conf.limits,
+        system: compiled.system, user: compiled.material
+      })
+    }).then(function (res) {
+      if (!res || !res.ok) {
+        state.batch.fail++; state.batch.done++;
+        batchRow(t, false, (res && res.message) || '模型没有返回内容');
+        batchTick();
+        return null;
+      }
+      let text = res.text;
+      let check = HP.Eval.machineCheck(text, material);
+      const autoOn = !(conf.evalConfig && conf.evalConfig.autoRework === false);
+      const next = (autoOn && HP.Eval.fixableIssues(check).length)
+        ? HP.Eval.autoRework({
+            copy: text, material: material,
+            maxRounds: Number((conf.evalConfig && conf.evalConfig.maxReworkRounds) == null ? 2 : conf.evalConfig.maxReworkRounds),
+            meta: { products: products, materialText: material.text, system: compiled.system }
+          }).then(function (rw) { return { text: rw.text, check: rw.check, rework: rw }; })
+        : Promise.resolve({ text: text, check: check, rework: null });
+      return next.then(function (done) {
+        const qid = 'q_' + t.newsId + '_' + t.styleId + '_' + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36);
+        HP.Workspace.enqueue([{
+          id: qid, newsId: news.id, title: news.title, style: style.name,
+          productId: (prod && prod.id) || '', productName: (prod && prod.name) || '',
+          text: done.text, score: done.check.score, check: done.check, material: material,
+          model: res.model, source: 'batch'
+        }]);
+        state.batch.ok++; state.batch.done++;
+        batchRow(t, true, '机器校验 ' + done.check.score + ' 分' +
+          (done.check.pass ? ' · 通过' : ' · 有 ' + done.check.failed.length + ' 项待修'), done.check.score);
+        batchTick();
+      });
+    });
+  }
+
+  function runBatch() {
+    if (state.batch.running) return;
+    if (!state.batch.newsIds.length || !state.batch.styleIds.length) {
+      toast('至少选 1 条热点和 1 个创作风格', 'warn');
+      return;
+    }
+    const conc = Math.min(6, Math.max(1, Number($('#batchConc').value) || 3));
+    const tasks = [];
+    state.batch.newsIds.forEach(function (nid) {
+      const news = getNews(nid);
+      if (!news) return;
+      const m = matchesFor(news)[0];
+      state.batch.styleIds.forEach(function (sid) {
+        tasks.push({ newsId: nid, styleId: sid, productId: (m && m.product.id) || '' });
+      });
+    });
+    state.batch.tasks = tasks;
+    state.batch.done = 0; state.batch.ok = 0; state.batch.fail = 0; state.batch.stop = false;
+    state.batch.running = true;
+    $('#batchResults').hidden = false;
+    $('#batchProgress').hidden = false;
+    $('#batchBody').innerHTML = '';
+    $('#batchStop').hidden = false;
+    $('#batchStart').hidden = true;
+    batchTick();
+
+    /* 开跑前重新读一次配置：后台刚改的提示词 / 模型立刻生效 */
+    return HP.Config.load().catch(() => null).then(function () {
+      let idx = 0;
+      const worker = function () {
+        if (state.batch.stop || idx >= tasks.length) return Promise.resolve();
+        const t = tasks[idx++];
+        return runBatchTask(t).then(worker);
+      };
+      const pool = [];
+      for (let i = 0; i < conc; i++) pool.push(worker());
+      return Promise.all(pool);
+    }).then(function () {
+      state.batch.running = false;
+      $('#batchStop').hidden = true;
+      $('#batchStart').hidden = false;
+      $('#batchStart').disabled = false;
+      $('#batchStart').textContent = '再跑一批';
+      if (window.HP && HP.Workspace) HP.Workspace.batchDone(state.batch.tasks.length, state.batch.ok);
+      toast('批量完成：成功 ' + state.batch.ok + ' / ' + state.batch.tasks.length + ' 条' +
+        (state.batch.stop ? '（中途停止，未派发的任务已取消）' : '') + '，结果已全部进入待审队列',
+        state.batch.fail ? 'warn' : 'ok');
+      renderQueue();
+      if (state.step === 5) renderStep5();
+    });
+  }
+
+  /* ---------------- 待审队列 ---------------- */
+  function renderQueue() {
+    const box = $('#queueList');
+    if (!box || !window.HP || !HP.Workspace) return;
+    const q = HP.Workspace.queue();
+    const st = HP.Workspace.queueStats();
+    const badge = $('#queueBadge');
+    if (badge) badge.textContent = st.wait;
+    if (!q.length) {
+      box.innerHTML = '<li class="empty-mini">队列是空的：Step 4 生成后点「送入待审队列」，或在 Step 1 勾选多条做批量生成。</li>';
+      return;
+    }
+    box.innerHTML = q.slice().reverse().slice(0, 15).map(function (it) {
+      const cls = it.status === '已通过' ? 'pass' : it.status === '已发布' ? 'published' : it.status === '已打回' ? 'fail' : 'wait';
+      const active = state.queueId === it.id ? ' active' : '';
+      return '<li class="queue-item' + active + '" data-q="' + esc(it.id) + '">' +
+        '<div class="qi-main"><b>' + esc(String(it.title || '').slice(0, 18)) + '</b>' +
+          '<i>' + esc(it.style || '—') + ' · ' + esc(it.productName || '—') + '</i></div>' +
+        '<span class="qi-score ' + scoreCls(it.score) + '">' + (it.score == null ? '—' : it.score) + '</span>' +
+        '<span class="state-pill ' + cls + '">' + esc(it.status) + '</span></li>';
+    }).join('');
+  }
+
+  function openQueueItem(id) {
+    if (!window.HP || !HP.Workspace) return;
+    const it = HP.Workspace.currentQueueItem(id);
+    if (!it) return;
+    state.queueId = id;
+    if (getNews(it.newsId)) state.selectedNewsId = it.newsId;
+    if (getProduct(it.productId)) state.bound = [it.productId];
+    const vid = 'qv_' + it.id;
+    let v = state.copy.versions.filter(x => x.id === vid)[0];
+    if (!v) {
+      const check = it.material ? HP.Eval.machineCheck(it.text, it.material) : (it.check || null);
+      v = {
+        id: vid, label: (it.style || '候选') + ' · 队列', style: it.style || '',
+        text: it.text, tune: null, model: it.model || '', promptUnknown: [],
+        system: '', machine: check, material: it.material || null, rework: null, review: null
+      };
+      state.copy.versions = state.copy.versions.filter(x => x.id !== vid).concat([v]);
+    }
+    state.copy.selectedId = vid;
+    state.review = {
+      status: it.status === '已通过' || it.status === '已发布' ? 'pass' : 'wait',
+      published: it.status === '已发布', checks: [], blocked: false
+    };
+    if (state.view !== 'work') setView('work');
+    goStep(5);
+    toast('已载入队列文案：' + String(it.title || '').slice(0, 14) + '…', '');
+  }
+
+  function queueApprove() {
+    if (!state.queueId) { toast('先在右侧待审队列里点一条文案，再按 A 通过', 'warn'); return; }
+    HP.Workspace.setQueueStatus(state.queueId, '已通过');
+    state.review.status = 'pass';
+    toast('已通过（A），可以一键发送了', 'ok');
+    renderStep5(); renderFlow(); renderContextBar();
+    const nx = HP.Workspace.nextInQueue(state.queueId, 1);
+    if (nx && nx.id !== state.queueId) setTimeout(() => openQueueItem(nx.id), 260);
+  }
+
+  function queueReject(reason) {
+    if (!state.queueId) { toast('先选一条待审文案', 'warn'); return; }
+    const why = String(reason || '').trim();
+    if (!why) { toast('打回必须填原因，运营要知道为什么被打回', 'warn'); return; }
+    HP.Workspace.setQueueStatus(state.queueId, '已打回', { reason: why });
+    state.review.status = 'wait';
+    logEvent('文案被打回', '原因：' + why);
+    toast('已打回，原因已记录：' + why, 'ok');
+    const box = $('#queueReject'); if (box) box.hidden = true;
+    const inp = $('#rejectReason'); if (inp) inp.value = '';
+    renderStep5(); renderFlow(); renderContextBar();
+    const nx = HP.Workspace.nextInQueue(state.queueId, 1);
+    if (nx && nx.id !== state.queueId) setTimeout(() => openQueueItem(nx.id), 260);
+  }
+
+  /* ---------------- 顶部导航视图切换 ---------------- */
+  function setView(name) {
+    state.view = name;
+    const layout = document.querySelector('.layout');
+    if (layout) layout.hidden = name !== 'work';
+    ['products', 'center', 'dash'].forEach(function (v) {
+      const el = $('#view-' + v);
+      if (el) el.hidden = v !== name;
+    });
+    $$('#topNav a').forEach(a => a.classList.toggle('active', a.dataset.view === name));
+    if (name === 'center' && HP.Views && HP.Views.center) HP.Views.center.render($('#view-center'));
+    if (name === 'dash' && HP.Views && HP.Views.dash) HP.Views.dash.render($('#view-dash'));
+    if (name === 'products') renderProductsView();
+    window.scrollTo({ top: 0 });
+  }
+
+  /* 商品库（工作台内的只读视图；维护入口在后台商品库页） */
+  function renderProductsView() {
+    const el = $('#view-products');
+    if (!el) return;
+    const list = allProducts();
+    const kw = (state.libFilter.keyword || '').trim().toLowerCase();
+    const shown = kw
+      ? list.filter(p => (p.name + p.brand + p.cat + (p.points || []).join(' ')).toLowerCase().indexOf(kw) > -1)
+      : list;
+    const cats = Array.from(new Set(list.map(p => p.cat)));
+    const avg = list.length ? Math.round(list.reduce((s, p) => s + (p.price / (p.marketPrice || p.price) * 10), 0) / list.length * 10) / 10 : 0;
+    el.innerHTML =
+      '<div class="view-head"><div><h1>商品库</h1>' +
+        '<p class="sub">工作台里的商品全景（只读）。新增 / 编辑 / 批量导入请去 <a class="link" href="admin.html#/products">后台商品库</a>。</p></div>' +
+        '<div class="head-actions"><input class="text-input" id="pvSearch" placeholder="搜索名称 / 品牌 / 卖点…" value="' + esc(state.libFilter.keyword || '') + '" />' +
+        '<button class="btn ghost" data-view-go="3">去 Step 3 绑定</button></div></div>' +
+      '<div class="stat-row">' +
+        statCard('商品总数', list.length, '件', '当前商品库', '') +
+        statCard('品类数', cats.length, '个', cats.slice(0, 4).join(' / '), '') +
+        statCard('筛选结果', shown.length, '件', kw ? '关键词「' + kw + '」' : '未筛选', '') +
+        statCard('平均折扣', avg.toFixed(1), '折', '按售价 / 原价计算', 'trend-flat') +
+      '</div>' +
+      '<div class="product-grid">' + shown.map(p => HP.Products.cardHtml(p, {
+        actions: '<button class="btn ghost tiny" data-pbind="' + p.id + '">带入工作台绑定</button>'
+      })).join('') + '</div>' +
+      (shown.length ? '' : '<div class="empty-state"><b>没有匹配的商品</b>换个关键词试试。</div>');
+
+    const search = el.querySelector('#pvSearch');
+    if (search) search.addEventListener('input', function () {
+      state.libFilter.keyword = search.value;
+      renderProductsView();
+      const s2 = el.querySelector('#pvSearch');
+      if (s2) { s2.focus(); s2.setSelectionRange(s2.value.length, s2.value.length); }
+    });
+    el.querySelectorAll('[data-pbind]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        state.bound = [b.dataset.pbind];
+        setView('work');
+        goStep(3);
+        toast('已把「' + (getProduct(b.dataset.pbind) || {}).name + '」带进 Step 3', 'ok');
+      });
+    });
+    const go = el.querySelector('[data-view-go]');
+    if (go) go.addEventListener('click', function () { setView('work'); goStep(Number(go.dataset.viewGo)); });
+  }
+
+  /* ---------------- 事件绑定：运营效率 ---------------- */
+  function wireEfficiency() {
+    $$('#topNav a').forEach(function (a) {
+      if (!a.dataset.view) return;
+      a.addEventListener('click', function (e) {
+        e.preventDefault();
+        setView(a.dataset.view);
+        if (a.dataset.view === 'work') goStep(state.step);
+      });
+    });
+
+    const mb = $('#multiBatch'); if (mb) mb.addEventListener('click', openBatch);
+    const mp = $('#multiPool');
+    if (mp) mp.addEventListener('click', function () {
+      const ids = state.selectedNewsIds.slice();
+      if (!ids.length) { toast('先勾选热点', 'warn'); return; }
+      let added = 0;
+      ids.forEach(function (id) { if (addToPool(id)) added++; });
+      toast('已处理 ' + ids.length + ' 条热点（已在池子里的不会重复加）', added ? 'ok' : '');
+      state.selectedNewsIds = [];
+      renderNewsList();
+    });
+    const mc = $('#multiClear');
+    if (mc) mc.addEventListener('click', function () { state.selectedNewsIds = []; renderNewsList(); });
+
+    const poolBtn2 = $('#poolBtn2');
+    if (poolBtn2) poolBtn2.addEventListener('click', function () {
+      if (!state.selectedNewsId) { toast('请先选择热点', 'warn'); return; }
+      addToPool(state.selectedNewsId);
+    });
+
+    /* 批量弹窗 */
+    const bm = $('#batchMask');
+    const bc = $('#batchCancel');
+    if (bc) bc.addEventListener('click', function () { if (!state.batch.running) bm.hidden = true; else toast('正在跑，先点「停止」再关闭', 'warn'); });
+    const bs = $('#batchStart'); if (bs) bs.addEventListener('click', runBatch);
+    const bstop = $('#batchStop');
+    if (bstop) bstop.addEventListener('click', function () {
+      state.batch.stop = true;
+      bstop.disabled = true; bstop.textContent = '停止中…（在跑的会跑完）';
+      toast('已停止派发新任务，正在跑的会跑完', 'warn');
+    });
+    const bconc = $('#batchConc'); if (bconc) bconc.addEventListener('input', batchEstimate);
+    const bnc = $('#batchNewsChips');
+    if (bnc) bnc.addEventListener('change', function (e) {
+      const id = e.target.dataset ? e.target.dataset.bnews : '';
+      if (!id) return;
+      if (e.target.checked) { if (state.batch.newsIds.indexOf(id) < 0) state.batch.newsIds.push(id); }
+      else state.batch.newsIds = state.batch.newsIds.filter(x => x !== id);
+      batchEstimate();
+    });
+    const bsc = $('#batchStyleChips');
+    if (bsc) bsc.addEventListener('change', function (e) {
+      const id = e.target.dataset ? e.target.dataset.bstyle : '';
+      if (!id) return;
+      if (e.target.checked) { if (state.batch.styleIds.indexOf(id) < 0) state.batch.styleIds.push(id); }
+      else state.batch.styleIds = state.batch.styleIds.filter(x => x !== id);
+      batchEstimate();
+    });
+
+    /* 待审队列 */
+    const ql = $('#queueList');
+    if (ql) ql.addEventListener('click', function (e) {
+      const li = e.target.closest ? e.target.closest('[data-q]') : null;
+      if (li) openQueueItem(li.dataset.q);
+    });
+    const rok = $('#rejectOk');
+    if (rok) rok.addEventListener('click', function () { queueReject(($('#rejectReason') || {}).value); });
+    const rc = $('#rejectCancel');
+    if (rc) rc.addEventListener('click', function () { $('#queueReject').hidden = true; });
+
+    /* 键盘：J/K 上下条，A 通过，R 打回 */
+    document.addEventListener('keydown', function (e) {
+      if (state.step !== 5 || state.view !== 'work') return;
+      const tag = (document.activeElement && document.activeElement.tagName) || '';
+      if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag)) return;
+      const k = String(e.key || '').toLowerCase();
+      if (k === 'j' || k === 'k') {
+        e.preventDefault();
+        const n = HP.Workspace.nextInQueue(state.queueId, k === 'j' ? 1 : -1);
+        if (n) openQueueItem(n.id); else toast('队列里没有待审文案了', '');
+      } else if (k === 'a') {
+        e.preventDefault(); queueApprove();
+      } else if (k === 'r') {
+        e.preventDefault();
+        const box = $('#queueReject');
+        if (box) { box.hidden = false; const inp = $('#rejectReason'); if (inp) inp.focus(); }
+      }
+    });
   }
 
   /* ---------------- 事件绑定 ---------------- */
@@ -1374,10 +1894,21 @@
 
   function initUI() {
     bindGoto(document);
+    /* 本机工作区（选题池 / 待审队列 / 指标）先读回来，再渲染 */
+    if (window.HP && HP.Workspace) HP.Workspace.load();
+    wireEfficiency();
     refreshNews();                       // 按后台启用中的来源构建热点列表
     rerenderStep1();
     renderFlow(); renderContextBar();
     goStep(1);
+    renderQueue();
+
+    /* 服务端模式：把定时抓到的热点池拉回来（没有服务端就保持空，不伪造） */
+    if (HP.Config.isServer()) {
+      refreshServerNews().then(function () {
+        refreshNews(); rerenderStep1(); renderFlow();
+      });
+    }
 
     /* 配置里缺了内置来源时（旧配置 / 导入丢字段），这里会提示已经自动补回来 */
     const autoFilled = (HP.Config.sourcesAutoFilled && HP.Config.sourcesAutoFilled()) || [];
@@ -1500,6 +2031,22 @@
     document.addEventListener('keydown', e => {
       if (e.altKey && e.key >= '1' && e.key <= '5') goStep(Number(e.key));
     });
+
+    /* 给内容中心 / 数据看板等独立视图用的上下文（它们是独立模块，不直接读 state） */
+    HP.AppCtx = {
+      goStep: goStep,
+      setView: setView,
+      toast: toast,
+      confirm: confirmModal,
+      selectNewsById: selectNews,
+      news: function () { return state.news.slice(); },
+      newsStats: function () { return state.serverNews.stats; },
+      newsRuns: function () { return state.serverNews.runs || []; },
+      refreshServerNews: refreshServerNews,
+      generateAll: generateAll,
+      queue: function () { return HP.Workspace.queue(); },
+      pool: function () { return HP.Workspace.pool(); }
+    };
   }
 
   document.addEventListener('DOMContentLoaded', init);

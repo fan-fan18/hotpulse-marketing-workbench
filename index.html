@@ -21,11 +21,12 @@
       </span>
       <span class="tag-demo">Demo</span>
     </div>
-    <nav class="top-nav">
-      <a class="active" href="javascript:void(0)">营销工作台</a>
-      <a href="javascript:void(0)">商品库</a>
-      <a href="javascript:void(0)">内容中心</a>
-      <a href="javascript:void(0)">数据看板</a>
+    <nav class="top-nav" id="topNav">
+      <a class="active" href="javascript:void(0)" data-view="work">营销工作台</a>
+      <a href="javascript:void(0)" data-view="products">商品库</a>
+      <a href="javascript:void(0)" data-view="center">内容中心</a>
+      <a href="javascript:void(0)" data-view="dash">数据看板</a>
+      <a class="nav-admin" href="admin.html">配置后台</a>
     </nav>
   </div>
 
@@ -143,7 +144,13 @@
 
       <div class="list-head">
         <h2>实时热点列表 <em id="newsCount"></em></h2>
-        <span class="hint">点击卡片即选中该热点，后续步骤将沿用此上下文</span>
+        <div class="multi-bar" id="multiBar" hidden>
+          已选 <b id="multiCount">0</b> 条
+          <button class="btn soft sm" id="multiBatch">批量生成</button>
+          <button class="btn ghost sm" id="multiPool">加入选题池</button>
+          <button class="btn ghost sm" id="multiClear">清空</button>
+        </div>
+        <span class="hint">勾选卡片左侧可多选批量生成；点击卡片即选中该热点</span>
       </div>
       <div class="news-list" id="newsList"></div>
     </section>
@@ -156,6 +163,7 @@
           <p class="sub">系统基于「热点语义 + 商品标签 + 近期转化数据」自动推荐关联商品。</p>
         </div>
         <div class="head-actions">
+          <button class="btn ghost" id="poolBtn2">加入选题池</button>
           <button class="btn ghost" id="rematchBtn">
             <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4V1L7 6l5 5V8a4 4 0 1 1-4 4H6a6 6 0 1 0 6-8Z"/></svg>
             重新匹配
@@ -400,6 +408,17 @@
         </div>
 
         <aside class="split-side">
+          <div class="card side-card" id="queueCard">
+            <div class="side-head"><h3>待审队列</h3><span class="count-badge" id="queueBadge">0</span></div>
+            <ul class="queue-list" id="queueList"></ul>
+            <div class="queue-tips"><kbd>J</kbd> 下一条 <kbd>K</kbd> 上一条 <kbd>A</kbd> 通过 <kbd>R</kbd> 打回</div>
+            <div class="queue-reject" id="queueReject" hidden>
+              <input class="text-input sm" id="rejectReason" placeholder="打回原因（必填）" />
+              <button class="btn ghost sm" id="rejectCancel">取消</button>
+              <button class="btn danger sm" id="rejectOk">打回</button>
+            </div>
+          </div>
+
           <div class="card side-card">
             <div class="side-head"><h3>合规审核</h3><span class="count-badge" id="riskBadge">—</span></div>
             <ul class="check-list" id="checkList"></ul>
@@ -438,6 +457,50 @@
   </main>
 </div>
 
+<!-- ============ 独立视图：商品库 / 内容中心 / 数据看板 ============ -->
+<section class="view-page" id="view-products" hidden></section>
+<section class="view-page" id="view-center" hidden></section>
+<section class="view-page" id="view-dash" hidden></section>
+
+<!-- ============ 批量生成弹窗 ============ -->
+<div class="modal-mask" id="batchMask" hidden>
+  <div class="modal wide" role="dialog" aria-modal="true">
+    <h3>批量生成文案</h3>
+    <p class="modal-sub">每条热点 × 每个创作风格跑一次，结果统一进「待审队列」，审核通过后再发布。</p>
+    <div class="batch-form">
+      <div class="batch-block">
+        <label class="param-label">参与的热点 <em id="batchNewsHint">0 条</em></label>
+        <div class="batch-chips" id="batchNewsChips"></div>
+      </div>
+      <div class="batch-block">
+        <label class="param-label">创作风格 <em>每个风格独立跑一次</em></label>
+        <div class="batch-chips" id="batchStyleChips"></div>
+      </div>
+      <div class="batch-row">
+        <div class="batch-block narrow">
+          <label class="param-label">并发数 <em>默认 3，最多 6</em></label>
+          <input class="text-input" id="batchConc" type="number" min="1" max="6" value="3" />
+        </div>
+        <div class="batch-est" id="batchEst">—</div>
+      </div>
+      <div class="batch-progress" id="batchProgress" hidden>
+        <div class="progress-track"><span id="batchBar" style="width:0%"></span></div>
+        <div class="batch-progress-txt" id="batchProgressTxt">0 / 0</div>
+      </div>
+      <div class="batch-results" id="batchResults" hidden>
+        <div class="table-wrap"><table class="table batch-table"><thead><tr>
+          <th>热点</th><th>风格</th><th>商品</th><th class="num">机器分</th><th>结果</th>
+        </tr></thead><tbody id="batchBody"></tbody></table></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="batchCancel">关闭</button>
+      <button class="btn danger" id="batchStop" hidden>停止</button>
+      <button class="btn primary" id="batchStart">开始生成</button>
+    </div>
+  </div>
+</div>
+
 <!-- 全局提示 & 弹窗 -->
 <div class="toast-wrap" id="toastWrap"></div>
 <div class="modal-mask" id="modalMask" hidden>
@@ -457,6 +520,10 @@
 <script src="assets/js/core/prompt.js"></script>
 <script src="assets/js/core/llm.js"></script>
 <script src="assets/js/core/eval.js"></script>
+<script src="assets/js/core/workflow.js"></script>
+<script src="assets/js/core/workspace.js"></script>
+<script src="assets/js/views/center.js"></script>
+<script src="assets/js/views/dash.js"></script>
 <script src="assets/js/app.js"></script>
 </body>
 </html>

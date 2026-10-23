@@ -176,6 +176,70 @@ HP.AdminPages = HP.AdminPages || {};
         }
       },
       {
+        id: 'sec-so-fetch', sectionKey: 'fetch', short: '定时抓取',
+        title: '定时抓取与热点池',
+        desc: '服务端按固定间隔自动抓取启用中的来源，条目先去重再进热点池（data/news.json）。关掉开关后不再自动抓，工作台的「一键抓取」仍然可以手动触发。',
+        render: function () {
+          var f = A().getDraft().fetch || {};
+          var on = f.enabled !== false;
+          return '<div class="row" style="align-items:center">' +
+              '<label style="display:flex;align-items:center;gap:8px;font-size:13.5px">' +
+                '<input type="checkbox" id="soFetchOn" ' + (on ? 'checked' : '') + ' /> 启用定时抓取（服务端）' +
+              '</label>' +
+            '</div>' +
+            '<div class="row" style="margin-top:12px;align-items:flex-end">' +
+              '<div class="col narrow"><label class="label">抓取间隔（分钟）<em>1–240</em></label>' +
+                '<input class="input" id="soFetchInterval" type="number" min="1" max="240" value="' + esc(f.intervalMin || 10) + '" /></div>' +
+              '<div class="col narrow"><label class="label">热点保留天数<em>1–30</em></label>' +
+                '<input class="input" id="soFetchKeep" type="number" min="1" max="30" value="' + esc(f.keepDays || 7) + '" /></div>' +
+              '<div class="col"><label class="label">服务端当前状态</label>' +
+                '<div class="help" id="soFetchStatus">正在读取服务端状态…</div></div>' +
+            '</div>' +
+            '<div class="help" style="margin-top:10px">服务端启动 3 秒后先跑一次，之后按上面的间隔重复；抓取串行发起（对对方站点更友好），单个来源超时 6 秒，' +
+            '失败会记进抓取记录但不影响其它来源。热点池超过保留天数的条目会在下一轮抓取时清掉。</div>';
+        },
+        mount: function (body, ctx) {
+          var cb = body.querySelector('#soFetchOn');
+          if (cb) cb.addEventListener('change', function () {
+            ctx.draft.fetch = ctx.draft.fetch || {};
+            ctx.draft.fetch.enabled = cb.checked;
+            ctx.markDirty();
+            A().toast(cb.checked ? '已开启定时抓取（保存后生效）' : '已关闭定时抓取（保存后生效；工作台的手动抓取仍可用）', 'ok');
+          });
+          var iv = body.querySelector('#soFetchInterval');
+          if (iv) iv.addEventListener('change', function () {
+            var v = Math.max(1, Math.min(240, Number(iv.value) || 10));
+            iv.value = v;
+            ctx.draft.fetch = ctx.draft.fetch || {};
+            ctx.draft.fetch.intervalMin = v;
+            ctx.markDirty();
+            A().toast('抓取间隔改为 ' + v + ' 分钟（保存后重排定时器）', 'ok');
+          });
+          var kd = body.querySelector('#soFetchKeep');
+          if (kd) kd.addEventListener('change', function () {
+            var v = Math.max(1, Math.min(30, Number(kd.value) || 7));
+            kd.value = v;
+            ctx.draft.fetch = ctx.draft.fetch || {};
+            ctx.draft.fetch.keepDays = v;
+            ctx.markDirty();
+          });
+          var st = body.querySelector('#soFetchStatus');
+          if (!st) return;
+          if (!HP.Config.isServer()) {
+            st.innerHTML = '<span style="color:var(--warn)">没有连上本地服务端（演示模式）</span>：定时抓取只在服务端运行，这里仅展示配置。';
+            return;
+          }
+          fetch('api/health').then(function (r) { return r.json(); }).then(function (d) {
+            var n = (d && d.news) || {};
+            var last = n.lastRun;
+            st.innerHTML = '池内 <b>' + (n.total == null ? '—' : n.total) + '</b> 条 · 今日新增 <b>' + (n.today == null ? '—' : n.today) + '</b> 条' +
+              (last ? '<br />最近一次：' + new Date(last.at).toLocaleString('zh-CN') + '，新增 ' + (last.added || 0) + ' / 合并 ' + (last.merged || 0) +
+                '，耗时 ' + (last.ms || 0) + ' ms' : '<br />还没有抓取记录') +
+              (n.nextRunAt ? '<br />下次自动抓取：' + new Date(n.nextRunAt).toLocaleTimeString('zh-CN') : '');
+          }).catch(function () { st.textContent = '读取服务端状态失败（服务端可能刚重启）'; });
+        }
+      },
+      {
         id: 'sec-so-compliance', short: '合规提示',
         title: '合规提示（务必先读）',
         desc: '关于能抓什么、不能抓什么。',

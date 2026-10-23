@@ -11,6 +11,8 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { fetchSource } = require('./sources');
+const { createNewsStore } = require('./news');
 
 const ROOT = path.join(__dirname, '..');
 const DATA_DIR = path.join(ROOT, 'data');
@@ -154,106 +156,15 @@ function serveStatic(req, res, pathname) {
 
 /* 模型中转：密钥可以放在服务端环境变量里，浏览器完全不接触密钥 */
 /* ---------------- 来源测试：真发一次抓取，逐个返回结果与条目 ---------------- */
-function stripTags(s) {
-  return String(s || '')
-    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
-    .replace(/\s+/g, ' ').trim();
-}
-
-/* 从 RSS / Atom 文本里解析条目（零依赖，够用即可） */
-function parseFeed(text) {
-  var blocks = text.match(/<item[\s>][\s\S]*?<\/item>/gi) || text.match(/<entry[\s>][\s\S]*?<\/entry>/gi) || [];
-  return blocks.slice(0, 10).map(function (b) {
-    function pick(tag) {
-      var m = b.match(new RegExp('<' + tag + '[^>]*>([\\s\\S]*?)</' + tag + '>', 'i'));
-      return m ? stripTags(m[1]) : '';
-    }
-    var title = pick('title');
-    if (!title) return null;
-    var link = (b.match(/<link[^>]*href="([^"]+)"/i) || [])[1] || pick('link');
-    return {
-      title: title.slice(0, 140),
-      summary: (pick('description') || pick('summary') || pick('content')).slice(0, 240),
-      link: String(link || '').slice(0, 300)
-    };
-  }).filter(Boolean);
-}
-
-/* 从 JSON 数据里找条目 */
-function parseJsonItems(text) {
-  var data = null;
-  try { data = JSON.parse(text); } catch (e) { return []; }
-  var list = Array.isArray(data) ? data
-    : (data && (data.items || data.data || data.list || data.articles)) || [];
-  if (!Array.isArray(list)) return [];
-  return list.slice(0, 10).map(function (x) {
-    var title = x && (x.title || x.name || x.headline);
-    if (!title) return null;
-    return {
-      title: String(title).slice(0, 140),
-      summary: String((x.summary || x.description || x.content || '')).slice(0, 240),
-      link: String((x.link || x.url || '')).slice(0, 300)
-    };
-  }).filter(Boolean);
-}
-
 async function handleSourcesTest(req, res) {
   let body = {};
   try { body = JSON.parse(await readBody(req)); } catch (e) {}
   const list = body.sources || [];
   const results = [];
 
-  for (const s of list) {
-    const started = Date.now();
-    const target = String(s.url || '').trim();
-    if (!/^https?:\/\/.+/i.test(target)) {
-      results.push({ id: s.id, name: s.name, ok: false, ms: 0, count: 0, items: [], reason: '地址格式不对：必须以 http:// 或 https:// 开头' });
-      continue;
-    }
-    const ctrl = new AbortController();
-    const timer = setTimeout(function () { ctrl.abort(); }, 6000);
-    try {
-      const r = await fetch(target, { signal: ctrl.signal, headers: { 'User-Agent': 'HotPulse/1.0 (+prototype)' } });
-      const text = await r.text();
-      clearTimeout(timer);
-      if (!r.ok) {
-        results.push({
-          id: s.id, name: s.name, ok: false, ms: Date.now() - started, count: 0, items: [],
-          reason: '对方返回 HTTP ' + r.status + '（' + (r.status === 403 ? '拒绝访问' : r.status === 404 ? '地址不存在' : '请求被拒绝') + '）'
-        });
-        continue;
-      }
-      const ctype = String(r.headers.get('content-type') || '');
-      let items = [], kind = '';
-      if (/xml|rss|atom/i.test(ctype) || /<rss|<feed|<channel/i.test(text)) {
-        items = parseFeed(text); kind = 'feed';
-      } else if (/json/i.test(ctype)) {
-        items = parseJsonItems(text); kind = 'json';
-      }
-      const linkCount = Math.min(500, (text.match(/<a\s[^>]*href=/gi) || []).length);
-      const count = items.length || (kind === 'json' ? 0 : linkCount);
-      results.push({
-        id: s.id, name: s.name, ok: true, ms: Date.now() - started, count: count, items: items, kind: kind || 'html',
-        reason: items.length
-          ? ('解析出 ' + items.length + ' 条' + (kind === 'feed' ? '订阅条目' : ' JSON 条目'))
-          : (kind === 'json' ? '接口可访问，但没有解析出条目' : '页面可访问，粗略识别 ' + linkCount + ' 个链接（公开热榜多为前端渲染，拿不到标题）')
-      });
-    } catch (e) {
-      clearTimeout(timer);
-      const cause = (e && e.cause && (e.cause.code || e.cause.message)) || '';
-      const reason = e.name === 'AbortError' ? '超时（6 秒未响应）'
-        : /ENOTFOUND|EAI_AGAIN/.test(e.message + cause) ? '域名解析失败：地址可能不存在或写错了'
-          : /ECONNREFUSED/.test(e.message + cause) ? '对方拒绝连接（端口未开放或被防火墙拦截）'
-            : /ETIMEDOUT|UND_ERR_CONNECT_TIMEOUT|UND_ERR_HEADERS_TIMEOUT/.test(e.message + cause) ? '连接超时：对方没有在 6 秒内响应'
-              : /certificate|SSL|UNABLE_TO_VERIFY/i.test(e.message + cause) ? 'HTTPS 证书校验失败'
-                : /ENETUNREACH|EACCES/.test(e.message + cause) ? '网络不可达（当前环境可能限制了外网访问）'
-                  : '请求失败：' + (cause || e.message);
-      results.push({ id: s.id, name: s.name, ok: false, ms: Date.now() - started, count: 0, items: [], reason: reason });
-    }
-  }
+  /* 抓取逻辑与定时抓取共用 server/sources.js，避免两套实现漂移 */
+  for (const s of list) results.push(await fetchSource(s, 6000));
+
   send(res, 200, { ok: true, via: 'server', testedAt: new Date().toISOString(), results: results });
 }
 
@@ -295,13 +206,24 @@ async function handleLLM(req, res) {
   }
 }
 
+/* 热点池：定时抓取 + 去重 + 热度采样（数据落在 data/news.json） */
+const newsStore = createNewsStore({
+  dataDir: DATA_DIR,
+  getConfig: function () { const r = readConfig(); return r.ok ? r.config : {}; },
+  log: function (m) { console.log('  [news] ' + m); }
+});
+newsStore.load();
+
 const server = http.createServer(async function (req, res) {
   const pathname = new URL(req.url, 'http://localhost').pathname;
   res.setHeader('Access-Control-Allow-Origin', '*');
   try {
     if (pathname === '/favicon.ico') { res.writeHead(204); return res.end(); }
     if (pathname === '/api/health') {
-      return send(res, 200, { ok: true, name: 'hotpulse-local', port: PORT, configFile: CONFIG_FILE, time: new Date().toISOString() });
+      return send(res, 200, {
+        ok: true, name: 'hotpulse-local', port: PORT, configFile: CONFIG_FILE, time: new Date().toISOString(),
+        news: newsStore.stats()
+      });
     }
     if (pathname === '/api/config' && req.method === 'GET') {
       const r = readConfig();
@@ -316,7 +238,17 @@ const server = http.createServer(async function (req, res) {
       try { body = JSON.parse(await readBody(req)); }
       catch (e) { return send(res, 400, { ok: false, errors: ['请求体不是合法 JSON'] }); }
       const r = writeConfig(body.config || body);
+      /* 抓取开关 / 间隔可能被改了，立刻按新配置重排定时器 */
+      if (r.ok) { try { newsStore.reschedule(); } catch (e) {} }
       return send(res, r.ok ? 200 : (r.status || 400), r.ok ? r : { ok: false, errors: r.errors });
+    }
+    /* ---------------- 热点池 ---------------- */
+    if (pathname === '/api/news' && req.method === 'GET') {
+      return send(res, 200, { ok: true, stats: newsStore.stats(), items: newsStore.list(), runs: newsStore.runs() });
+    }
+    if (pathname === '/api/news/refresh' && req.method === 'POST') {
+      const r = await newsStore.refresh();
+      return send(res, r.ok ? 200 : 409, Object.assign({ ok: r.ok }, r, { stats: newsStore.stats() }));
     }
     if (pathname === '/api/config/backups' && req.method === 'GET') {
       ensureDirs();
@@ -360,6 +292,12 @@ server.listen(PORT, HOST, function () {
   console.log('  配置文件：' + CONFIG_FILE);
   console.log('  备份目录：' + BACKUP_DIR);
   console.log('  静态访问已收口：data/ server/ tests/ scripts/ work/ outputs/ 不对外开放');
+  const sched = newsStore.start();
+  if (sched.ok) {
+    console.log('  定时抓取：已开启，启动 3 秒后先跑一次，之后每 ' + sched.intervalMin + ' 分钟一次');
+  } else {
+    console.log('  定时抓取：已关闭（后台「抓取来源」页可开启）');
+  }
 });
 
 server.on('error', function (e) {

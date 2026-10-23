@@ -174,6 +174,13 @@ window.HP = window.HP || {};
       cases: []
     },
 
+    /* 定时抓取（后台「抓取来源」页维护；服务端按这里的间隔自动抓） */
+    fetch: {
+      enabled: true,
+      intervalMin: 10,        // 每 N 分钟抓一次
+      keepDays: 7             // 热点在池子里保留几天
+    },
+
     ui: { adminPage: 'overview', view: 'table' }
   };
 
