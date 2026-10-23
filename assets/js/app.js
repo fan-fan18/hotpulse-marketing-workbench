@@ -362,13 +362,18 @@
     const srcOn = enabledSources().length;
     const withItems = enabledWithItems().length;
     const server = HP.Config.isServer();
+    /* 手动抓取优先；没有就显示服务端定时抓取的那一次（不伪造） */
+    const lastRun = state.serverNews.stats && state.serverNews.stats.lastRun;
+    const lastAt = state.stats.lastFetch || (lastRun && lastRun.at ? new Date(lastRun.at) : null);
+    const lastNote = state.stats.lastFetchNote
+      || (lastRun ? '服务端定时抓取：新增 ' + (lastRun.added || 0) + ' · 合并 ' + (lastRun.merged || 0)
+        : (server ? '还没抓取过 · 服务端已连接' : '还没抓取过 · 演示模式不会真抓'));
     $('#newsStats').innerHTML = [
       statCard('当前热点列表', list.length, '条',
         '启用来源 ' + srcOn + ' 个 · 其中有条目 ' + withItems + ' 个', list.length ? '' : 'trend-flat'),
       statCard('高潜热点', high, '条', '热度 > 850 且仍在上升', 'trend-up'),
       statCard('已选热点', picked, '条', '作为本次营销主线', ''),
-      statCard('最近抓取', state.stats.lastFetch ? clock(state.stats.lastFetch) : '—', '',
-        state.stats.lastFetchNote || (server ? '还没抓取过 · 服务端已连接' : '还没抓取过 · 演示模式不会真抓'), 'trend-flat')
+      statCard('最近抓取', lastAt ? clock(lastAt) : '—', '', lastNote, 'trend-flat')
     ].join('');
   }
   function statCard(k, v, unit, d, cls) {
@@ -1783,6 +1788,20 @@
     if (go) go.addEventListener('click', function () { setView('work'); goStep(Number(go.dataset.viewGo)); });
   }
 
+  /* 自动刷新：服务端模式下每 5 分钟从热点池拉一次最新（只读，不触发抓取） */
+  let autoRefreshTimer = null;
+  function setAutoRefresh(on) {
+    if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
+    if (!on) return;
+    autoRefreshTimer = setInterval(function () {
+      if (!HP.Config.isServer()) return;
+      refreshServerNews().then(function () {
+        refreshNews();
+        if (state.view === 'work' && state.step === 1) rerenderStep1();
+      });
+    }, 5 * 60 * 1000);
+  }
+
   /* ---------------- 事件绑定：运营效率 ---------------- */
   function wireEfficiency() {
     $$('#topNav a').forEach(function (a) {
@@ -1922,9 +1941,10 @@
     $('#newsSource').addEventListener('change', e => { state.newsFilter.source = e.target.value; renderNewsList(); });
     $('#newsTime').addEventListener('change', e => { state.newsFilter.time = e.target.value; renderNewsList(); });
     $('#newsSort').addEventListener('change', e => { state.newsFilter.sort = e.target.value; renderNewsList(); });
-    $('#autoRefresh').addEventListener('change', e => toast(e.target.checked
+    setAutoRefresh($('#autoRefresh').checked);
+    $('#autoRefresh').addEventListener('change', e => { setAutoRefresh(e.target.checked); toast(e.target.checked
       ? (HP.Config.isServer() ? '已开启自动刷新（每 5 分钟抓一次，仅服务端模式有效）' : '已开启自动刷新（演示模式：实际不会抓取，只是状态展示）')
-      : '已关闭自动刷新', e.target.checked && !HP.Config.isServer() ? 'warn' : ''));
+      : '已关闭自动刷新', e.target.checked && !HP.Config.isServer() ? 'warn' : ''); });
 
     $('#rematchBtn').addEventListener('click', () => {
       if (!state.selectedNewsId) { toast('请先选择热点', 'warn'); return; }
