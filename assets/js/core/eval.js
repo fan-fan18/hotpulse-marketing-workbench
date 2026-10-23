@@ -681,15 +681,21 @@ window.HP = window.HP || {};
   }
 
   /* 从真实业务数据一键生成种子用例：热点 + 该热点的推荐商品 + 语调 */
-  function seedCases() {
+  function seedCases(list) {
     var conf = HP.Config.get();
-    var news = (window.MOCK && window.MOCK.NEWS) || [];
+    var news = (list && list.length) ? list : ((window.MOCK && window.MOCK.NEWS) || []);
     var out = [];
     news.slice(0, 6).forEach(function (n, i) {
       var mapped = (window.MOCK.MATCH_MAP && window.MOCK.MATCH_MAP[n.id]) || [];
       var ids = mapped.slice(0, 2).map(function (m) { return m.pid; })
         .filter(function (id) { return conf.products.some(function (p) { return p.id === id; }); });
-      if (!ids.length) ids = conf.products.slice(0, 2).map(function (p) { return p.id; });
+      /* 真实抓到的热点没有预置推荐关系：用工作台同一套匹配算法现算 */
+      if (!ids.length && HP.Products && HP.Products.matchScore) {
+        ids = (conf.products || []).map(function (p) {
+          return { id: p.id, s: HP.Products.matchScore(p, n) };
+        }).sort(function (a, b) { return b.s - a.s; }).slice(0, 2).map(function (x) { return x.id; });
+      }
+      if (!ids.length) ids = (conf.products || []).slice(0, 2).map(function (p) { return p.id; });
       var tone = (conf.tones[i % Math.max(1, conf.tones.length)] || { name: '热点借势' }).name;
       out.push({
         id: 'case_' + n.id,

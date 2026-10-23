@@ -2065,6 +2065,8 @@
       newsRuns: function () { return state.serverNews.runs || []; },
       refreshServerNews: refreshServerNews,
       generateAll: generateAll,
+      bound: function () { return state.bound.slice(); },
+      tone: function () { var el = document.getElementById('tonePick'); return el ? el.value : ''; },
       queue: function () { return HP.Workspace.queue(); },
       pool: function () { return HP.Workspace.pool(); }
     };

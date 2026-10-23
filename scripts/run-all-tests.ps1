@@ -1,4 +1,4 @@
-﻿# 全量回归（24 套：内核单测 + 部署自检 + 真浏览器验收）
+﻿# 全量回归（25 套：内核单测 + 部署自检 + 真浏览器验收 + 自建数据实跑）
 # 用法： powershell -ExecutionPolicy Bypass -File scripts/run-all-tests.ps1
 # 说明：UI 类脚本会用本机 Chrome 跑真实页面；跑之前会把 data/config.json 挪到 work/ 备份，跑完还原。
 $ErrorActionPreference = 'Continue'
@@ -10,7 +10,8 @@ $suites = @(
   'acceptance-tests','deploy-tests',
   'ui-smoke','ui-prompt-tests','ui-trial-tests','ui-save-tests','ui-styles-tests','ui-model-tests',
   'ui-products-tests','ui-product-edit-tests','ui-product-batch-tests','ui-sources-tests','ui-fetch-tests',
-  'ui-eval-workbench-tests','ui-eval-page-tests','acceptance-ui','ui-deploy-tests','ui-efficiency-tests'
+  'ui-eval-workbench-tests','ui-eval-page-tests','acceptance-ui','ui-deploy-tests','ui-efficiency-tests',
+  'ui-realdata-tests'
 )
 
 # 只在项目目录内清理测试用配置，先做路径校验

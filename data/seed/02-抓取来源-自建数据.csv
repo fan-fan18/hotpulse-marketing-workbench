@@ -1,0 +1,3 @@
+﻿名称,地址,类型,启用,备注
+中国新闻网滚动,https://www.chinanews.com.cn/rss/scroll-news.xml,feed,是,公开 RSS，真实抓取
+本地演示源,http://127.0.0.1:8899/rss,feed,是,本地 stub RSS，验证抓取链路

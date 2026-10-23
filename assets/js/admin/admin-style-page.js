@@ -59,7 +59,7 @@ HP.AdminPages = HP.AdminPages || {};
         id: 'sec-st-list', sectionKey: 'styles', short: '创作风格',
         title: '创作风格',
         desc: '每个风格 = 一个名称 + 一段创作要求。工作台里勾选几个风格，就会生成几个候选版本；至少保留一个。',
-        actions: '<button class="btn soft tiny" id="addStyle">+ 新增创作风格</button>',
+        actions: '<button class="btn ghost tiny" data-tpl="styles">填写模板</button>' + '<button class="btn soft tiny" id="addStyle">+ 新增创作风格</button>',
         render: function () {
           var draft = A().getDraft();
           var styles = draft.styles || [];
@@ -136,7 +136,7 @@ HP.AdminPages = HP.AdminPages || {};
         id: 'sec-st-tone', sectionKey: 'tones', short: '语调预设',
         title: '语调预设',
         desc: '这组标签会出现在工作台的「主打语调」下拉里，并作为素材里的 {{语调}} 传给模型。',
-        actions: '<button class="btn soft tiny" id="addTone">+ 新增语调</button>',
+        actions: '<button class="btn ghost tiny" data-tpl="tones">填写模板</button>' + '<button class="btn soft tiny" id="addTone">+ 新增语调</button>',
         render: function () {
           var tones = A().getDraft().tones || [];
           return '<div class="rule-list" id="toneList">' + tones.map(function (t, i) {

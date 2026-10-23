@@ -15,7 +15,8 @@ const { fetchSource } = require('./sources');
 const { createNewsStore } = require('./news');
 
 const ROOT = path.join(__dirname, '..');
-const DATA_DIR = path.join(ROOT, 'data');
+/* 数据目录：默认 data/；多实例或测试时可用 HOTPULSE_DATA_DIR 指到别处，互不干扰 */
+const DATA_DIR = process.env.HOTPULSE_DATA_DIR ? path.resolve(process.env.HOTPULSE_DATA_DIR) : path.join(ROOT, 'data');
 const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
 const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 const DEFAULTS_FILE = path.join(__dirname, 'defaults.json');

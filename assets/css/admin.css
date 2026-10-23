@@ -281,3 +281,14 @@ code{background:#f1f2f7;padding:1px 5px;border-radius:5px;font-size:12px}
   .stat-grid{grid-template-columns:repeat(2,1fr)}
   .admin-title{display:none}
 }
+
+/* ---------- 数据模板弹窗（每个数据入口共用） ---------- */
+.tpl-block{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;background:var(--bg-soft,#fafbfc)}
+.tpl-h{font-size:13px;font-weight:700;margin-bottom:6px}
+.tpl-p{font-size:12.5px;color:var(--ink-2);line-height:1.7;margin-bottom:10px}
+.tpl-btns{display:flex;flex-wrap:wrap;gap:8px}
+.tpl-errs{margin-top:10px;max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.tpl-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.tpl-tbl th,.tpl-tbl td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.tpl-tbl th{background:var(--bg-soft,#f6f7f9);font-weight:600;position:sticky;top:0}
+.tpl-apply{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}

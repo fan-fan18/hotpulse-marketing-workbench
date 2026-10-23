@@ -26,7 +26,7 @@ HP.AdminPages = HP.AdminPages || {};
         id: 'sec-so-list', sectionKey: 'sources', short: '来源列表',
         title: '来源列表',
         desc: '内置来源不能删除（可以停用）；自定义订阅源可以编辑和删除。停用后工作台不会再抓取它。',
-        actions: '<button class="btn soft tiny" id="soRefreshFromTest">按测试结果更新条目</button>',
+        actions: '<button class="btn ghost tiny" data-tpl="sources">填写模板</button>' + '<button class="btn soft tiny" id="soRefreshFromTest">按测试结果更新条目</button>',
         render: function () {
           var list = A().getDraft().sources || [];
           var enabled = list.filter(function (s) { return s.enabled; }).length;

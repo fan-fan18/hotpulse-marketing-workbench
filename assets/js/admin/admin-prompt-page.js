@@ -199,7 +199,7 @@ HP.AdminPages = HP.AdminPages || {};
         id: 'sec-p-role', sectionKey: 'prompt', short: '角色与写作规范',
         title: '角色设定与写作规范',
         desc: '模型的身份设定，以及逐条列举的写作规范。规范里同样可以用占位符（例如把字数区间写进去）。',
-        actions: '<button class="btn soft tiny" id="addRule">+ 新增一条规范</button>',
+        actions: '<button class="btn ghost tiny" data-tpl="prompt">填写模板</button>' + '<button class="btn soft tiny" id="addRule">+ 新增一条规范</button>',
         render: function () {
           var d = A().getDraft().prompt;
           return '<div style="margin-bottom:14px"><label class="label">角色设定 <em>模型的身份与输出格式要求</em></label>' +

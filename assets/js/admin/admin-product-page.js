@@ -428,6 +428,7 @@ HP.AdminPages = HP.AdminPages || {};
         id: 'sec-pr-io', short: '导入导出',
         title: '导入与导出',
         desc: '两种格式：结构化数据文件（JSON，适合备份迁移，完整保真）与表格文件（CSV，适合用表格软件批量编辑）。导入前先逐行校验，有问题的行会列出行号和原因，由你决定怎么处理。',
+        actions: '<button class="btn ghost tiny" data-tpl="products">填写模板</button>',
         render: function () {
           return '<div class="row">' +
               '<div class="col"><label class="label">导出</label>' +

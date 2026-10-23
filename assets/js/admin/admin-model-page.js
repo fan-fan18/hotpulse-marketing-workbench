@@ -29,6 +29,7 @@ HP.AdminPages = HP.AdminPages || {};
         id: 'sec-m-mode', sectionKey: 'model', short: '接入方式',
         title: '接入方式',
         desc: '决定模型请求从哪里发出。正式使用建议选「本地服务中转」，密钥不会出现在浏览器里。',
+        actions: '<button class="btn ghost tiny" data-tpl="model">填写模板</button>',
         render: function () {
           var m = A().getDraft().model || {};
           var noServer = !(HP.Config.isServer && HP.Config.isServer());

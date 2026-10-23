@@ -44,9 +44,37 @@ HP.AdminPages = HP.AdminPages || {};
     return e.cases;
   }
 
+  /* ---------------- 真实业务数据：服务端热点池 ---------------- */
+  /* 用例里除了内置示例热点，还要能引用「真抓到的」热点；没有服务端时这里保持为空，不伪造 */
+  var REAL = { loaded: false, tried: false, items: [], error: '' };
+  function loadRealNews() {
+    if (REAL.tried) return Promise.resolve(REAL.items);
+    REAL.tried = true;
+    if (!/^https?:/.test(window.location.protocol)) return Promise.resolve(REAL.items);
+    return fetch('api/news').then(function (r) { return r.json(); }).then(function (d) {
+      REAL.items = ((d && d.items) || []).map(function (it) {
+        var kws = String(it.title || '').replace(/[^\u4e00-\u9fa5A-Za-z0-9]+/g, ' ').split(' ').filter(Boolean);
+        return {
+          id: it.id, title: it.title, summary: it.summary || '',
+          source: it.source || '', sourceId: it.sourceId || '', cat: '订阅抓取',
+          heat: Number(it.heat) || 0, time: '', topics: kws.length ? ['#' + kws[0] + '#'] : ['#热点#'],
+          tags: kws.slice(0, 2), real: true
+        };
+      });
+      REAL.loaded = true;
+      return REAL.items;
+    }).catch(function (e) { REAL.error = e.message; return REAL.items; });
+  }
+  function newsList() {
+    var all = REAL.items.concat((window.MOCK && window.MOCK.NEWS) || []);
+    var seen = {}, out = [];
+    all.forEach(function (n) { if (n && n.id && !seen[n.id]) { seen[n.id] = 1; out.push(n); } });
+    return out;
+  }
+
   function resolveCase(ctx, c) {
     var cfg = ctx.draft;
-    var news = (window.MOCK.NEWS || []).filter(function (n) { return n.id === c.newsId; })[0] || (window.MOCK.NEWS || [])[0];
+    var news = newsList().filter(function (n) { return n.id === c.newsId; })[0] || newsList()[0];
     var prods = (c.productIds || []).map(function (id) {
       return (cfg.products || []).filter(function (p) { return p.id === id; })[0];
     }).filter(Boolean);
@@ -119,6 +147,10 @@ HP.AdminPages = HP.AdminPages || {};
             });
           });
           paint(ctx);
+          /* 真实热点池：加载完再重绘一次用例视图，让用例能选到真抓到的热点 */
+          loadRealNews().then(function () {
+            if (document.getElementById('evBody')) paint(ctx);
+          });
         }
       }
     ]
@@ -144,6 +176,7 @@ HP.AdminPages = HP.AdminPages || {};
         '<button class="btn primary tiny" id="evSeed">从真实业务数据生成种子用例</button>' +
         '<button class="btn ghost tiny" id="evAddCase">+ 新增用例</button>' +
         '<button class="btn ghost tiny" id="evClearCases">清空</button>' +
+        '<button class="btn ghost tiny" id="evTplCases">填写模板 / 导入用例</button>' +
         '<span class="help" style="margin-left:auto">共 ' + list.length + ' 条，勾选参与本轮 ' + sel + ' 条</span>' +
       '</div>' +
       (list.length
@@ -180,7 +213,7 @@ HP.AdminPages = HP.AdminPages || {};
       });
     });
     host.querySelector('#evSeed').addEventListener('click', function () {
-      var seeded = HP.Eval.seedCases();
+      var seeded = HP.Eval.seedCases(newsList());
       var existing = {};
       casesOf(ctx).forEach(function (c) { existing[c.id] = true; });
       var added = seeded.filter(function (c) { return !existing[c.id]; });
@@ -189,6 +222,10 @@ HP.AdminPages = HP.AdminPages || {};
       A().toast('已从真实业务数据生成 ' + added.length + ' 条种子用例', 'ok');
     });
     host.querySelector('#evAddCase').addEventListener('click', function () { openCaseEditor(ctx, -1); });
+    var tplBtn = host.querySelector('#evTplCases');
+    if (tplBtn) tplBtn.addEventListener('click', function () {
+      if (window.HP.AdminTemplates) window.HP.AdminTemplates.open('cases', ctx);
+    });
     host.querySelector('#evClearCases').addEventListener('click', function () {
       if (!casesOf(ctx).length) return;
       A().confirm({ title: '清空全部用例？', sub: '共 ' + casesOf(ctx).length + ' 条，清空后需要重新生成或新增。', okLabel: '清空' })
@@ -202,7 +239,7 @@ HP.AdminPages = HP.AdminPages || {};
 
   function openCaseEditor(ctx, index) {
     var isNew = index < 0;
-    var news = window.MOCK.NEWS || [];
+    var news = newsList();
     var tones = ctx.draft.tones || [];
     var base = isNew
       ? {
