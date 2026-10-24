@@ -14,6 +14,19 @@ const os = require('os');
 const { fetchSource } = require('./sources');
 const { createNewsStore } = require('./news');
 
+/* 本地密钥文件：server/.env.local（已加入 .gitignore，不会进仓库）
+   每行一个 KEY=VALUE，例如 HOTPULSE_API_KEY=sk-xxx */
+(function loadLocalEnv() {
+  const f = path.join(__dirname, '.env.local');
+  if (!fs.existsSync(f)) return;
+  try {
+    fs.readFileSync(f, 'utf8').split(/\r?\n/).forEach(function (line) {
+      const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/.exec(line);
+      if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
+    });
+  } catch (e) { console.warn('读取 server/.env.local 失败：' + e.message); }
+})();
+
 const ROOT = path.join(__dirname, '..');
 /* 数据目录：默认 data/；多实例或测试时可用 HOTPULSE_DATA_DIR 指到别处，互不干扰 */
 const DATA_DIR = process.env.HOTPULSE_DATA_DIR ? path.resolve(process.env.HOTPULSE_DATA_DIR) : path.join(ROOT, 'data');

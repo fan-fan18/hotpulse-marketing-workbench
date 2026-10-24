@@ -424,7 +424,7 @@
     skeleton: function () {
       return {
         type: 'hotpulse.model', version: 1,
-        model: { mode: 'relay', provider: 'openai', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', temperature: 0.85, stream: false },
+        model: { mode: 'proxy', provider: 'openai', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', temperature: 0.85, stream: false },
         note: '密钥不放在这个文件里：浏览器直连只存在本机浏览器；正式使用请在服务端配置环境变量。'
       };
     },
@@ -440,8 +440,8 @@
       var errs = [], warns = [];
       var m = (json && json.model) || json;
       if (!m || typeof m !== 'object') { errs.push('文件里没有 model 对象'); return { errors: errs, warnings: warns }; }
-      if (m.mode !== undefined && ['mock', 'relay', 'direct'].indexOf(m.mode) < 0)
-        errs.push('mode 只能是 mock（本地模拟）/ relay（本地服务中转）/ direct（浏览器直连）');
+      if (m.mode !== undefined && ['mock', 'proxy', 'direct'].indexOf(m.mode) < 0)
+        errs.push('mode 只能是 mock（本地模拟）/ proxy（本地服务中转）/ direct（浏览器直连）');
       if (m.baseUrl !== undefined && m.mode !== 'mock' && m.baseUrl !== '' && !isUrl(m.baseUrl))
         errs.push('baseUrl 不是合法地址：' + m.baseUrl);
       if (m.temperature !== undefined && !(num(m.temperature) >= 0 && num(m.temperature) <= 2)) errs.push('temperature 必须是 0–2 的数字');
